@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
-        Title="MARS ROVER - Vadasz Denes Informatika Verseny 2026"
+        Title="MARS ROVER &#8211; Vadász Dénes Informatika Verseny 2026"
         Width="1600" Height="950"
         MinWidth="1200" MinHeight="800"
         WindowStartupLocation="CenterScreen"
@@ -74,7 +74,7 @@
             <ColumnDefinition Width="420"/>
         </Grid.ColumnDefinitions>
 
-        <!-- BAL OLDAL: TERKEP + VEZERLO -->
+        <!-- BAL OLDAL: TÉRKÉP + VEZÉRLŐ -->
         <Grid Grid.Column="0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -82,7 +82,7 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <!-- Fejlec -->
+            <!-- Fejléc -->
             <Border Grid.Row="0" Style="{StaticResource PanelBorder}" Margin="8,8,4,0">
                 <Grid>
                     <Grid.ColumnDefinitions>
@@ -97,13 +97,13 @@
                         <StackPanel>
                             <TextBlock Text="MARS ROVER MISSION CONTROL" Foreground="#E8632B"
                                        FontSize="16" FontWeight="Bold" FontFamily="Consolas"/>
-                            <TextBlock x:Name="TxtSubtitle" Text="Vadasz Denes Informatika Verseny 2026"
+                            <TextBlock x:Name="TxtSubtitle" Text="Vadász Dénes Informatika Verseny 2026"
                                        Foreground="#6A5E65" FontSize="10"/>
                         </StackPanel>
                     </StackPanel>
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
-                        <TextBlock Text="Idokeret (ora):" Foreground="#8A7E85" VerticalAlignment="Center"
+                        <TextBlock Text="Időkeret (óra):" Foreground="#8A7E85" VerticalAlignment="Center"
                                    FontSize="12" Margin="0,0,6,0"/>
                         <TextBox x:Name="TxtHours" Width="60" Text="48" FontSize="14" FontFamily="Consolas"
                                  Background="#2A1A25" Foreground="#E8DDD3" BorderBrush="#3A2A35"
@@ -112,7 +112,7 @@
                     </StackPanel>
 
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
-                        <TextBlock Text="Animacio:" Foreground="#8A7E85" VerticalAlignment="Center"
+                        <TextBlock Text="Animáció:" Foreground="#8A7E85" VerticalAlignment="Center"
                                    FontSize="12" Margin="0,0,6,0"/>
                         <Slider x:Name="SpeedSlider" Width="100" Minimum="50" Maximum="1000" Value="200"
                                 VerticalAlignment="Center" IsSnapToTickEnabled="True" TickFrequency="50"/>
@@ -121,18 +121,18 @@
                     </StackPanel>
 
                     <StackPanel Grid.Column="3" Orientation="Horizontal">
-                        <Button x:Name="BtnStart" Content="INDITAS" Style="{StaticResource ActionBtn}"
+                        <Button x:Name="BtnStart" Content="&#9654; INDÍTÁS" Style="{StaticResource ActionBtn}"
                                 Click="BtnStart_Click" Margin="0,0,6,0"/>
-                        <Button x:Name="BtnPause" Content="PAUSE" Style="{StaticResource ActionBtn}"
+                        <Button x:Name="BtnPause" Content="SZÜNET" Style="{StaticResource ActionBtn}"
                                 Click="BtnPause_Click" IsEnabled="False" Padding="10,10"/>
-                        <Button x:Name="BtnExportLog" Content="LOG" Style="{StaticResource ActionBtn}"
+                        <Button x:Name="BtnExportLog" Content="NAPLÓ" Style="{StaticResource ActionBtn}"
                                 Click="BtnExportLog_Click" IsEnabled="False" Padding="10,10" Margin="6,0,0,0"
-                                ToolTip="Log exportalasa CSV-be"/>
+                                ToolTip="Napló exportálása CSV-be"/>
                     </StackPanel>
                 </Grid>
             </Border>
 
-            <!-- TERKEP CANVAS -->
+            <!-- TÉRKÉP CANVAS -->
             <Border Grid.Row="1" Style="{StaticResource PanelBorder}" Margin="8,4,4,4">
                 <Grid>
                     <Canvas x:Name="MapCanvas" ClipToBounds="True"/>
@@ -152,32 +152,32 @@
             </Border>
 
             <Border Grid.Row="2" Style="{StaticResource PanelBorder}" Margin="8,0,4,8" Padding="10,6">
-                <TextBlock x:Name="TxtStatus" Text="Terkep betoltve. Adj meg idokeretet es nyomj INDITAS-t."
+                <TextBlock x:Name="TxtStatus" Text="Térkép betöltve. Adj meg időkeretet és nyomj INDÍTÁS-t."
                            Foreground="#8A7E85" FontSize="11" FontFamily="Consolas"
                            TextTrimming="CharacterEllipsis"/>
             </Border>
         </Grid>
 
-        <!-- JOBB OLDAL: DASHBOARD -->
+        <!-- JOBB OLDAL: MŰSZERFAL -->
         <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" Margin="0,8,8,8">
             <StackPanel>
 
                 <Border Style="{StaticResource PanelBorder}">
                     <StackPanel>
-                        <TextBlock Text="AKKUMULATOR" Style="{StaticResource PanelTitle}"/>
+                        <TextBlock Text="AKKUMULÁTOR" Style="{StaticResource PanelTitle}"/>
                         <TextBlock x:Name="TxtBattery" Text="100" Style="{StaticResource BigValue}"/>
                         <Border Background="#2A1A25" CornerRadius="4" Height="14" Margin="0,8,0,0">
                             <Border x:Name="BatteryBar" Background="#4ADE80" CornerRadius="4"
                                     HorizontalAlignment="Left" Width="380"/>
                         </Border>
-                        <TextBlock x:Name="TxtBatteryInfo" Text="Toltes: +10/tick | Fogyasztas: -"
+                        <TextBlock x:Name="TxtBatteryInfo" Text="Töltés: +10/tick | Fogyasztás: -"
                                    Style="{StaticResource SmallLabel}" Margin="0,4,0,0"/>
                     </StackPanel>
                 </Border>
 
                 <Border Style="{StaticResource PanelBorder}">
                     <StackPanel>
-                        <TextBlock Text="GYUJTOTT ASVANYOK" Style="{StaticResource PanelTitle}"/>
+                        <TextBlock Text="GYŰJTÖTT ÁSVÁNYOK" Style="{StaticResource PanelTitle}"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -186,22 +186,22 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" HorizontalAlignment="Center">
-                                <TextBlock Text="OSSZES" Style="{StaticResource SmallLabel}" HorizontalAlignment="Center"/>
+                                <TextBlock Text="ÖSSZESEN" Style="{StaticResource SmallLabel}" HorizontalAlignment="Center"/>
                                 <TextBlock x:Name="TxtMineralTotal" Text="0" Style="{StaticResource BigValue}"
                                            Foreground="#E8632B" HorizontalAlignment="Center"/>
                             </StackPanel>
                             <StackPanel Grid.Column="1" HorizontalAlignment="Center">
-                                <TextBlock Text="KEK" Style="{StaticResource SmallLabel}" HorizontalAlignment="Center"/>
+                                <TextBlock Text="KÉK" Style="{StaticResource SmallLabel}" HorizontalAlignment="Center"/>
                                 <TextBlock x:Name="TxtMineralB" Text="0" Style="{StaticResource BigValue}"
                                            Foreground="#60A5FA" HorizontalAlignment="Center" FontSize="22"/>
                             </StackPanel>
                             <StackPanel Grid.Column="2" HorizontalAlignment="Center">
-                                <TextBlock Text="SARGA" Style="{StaticResource SmallLabel}" HorizontalAlignment="Center"/>
+                                <TextBlock Text="SÁRGA" Style="{StaticResource SmallLabel}" HorizontalAlignment="Center"/>
                                 <TextBlock x:Name="TxtMineralY" Text="0" Style="{StaticResource BigValue}"
                                            Foreground="#FACC15" HorizontalAlignment="Center" FontSize="22"/>
                             </StackPanel>
                             <StackPanel Grid.Column="3" HorizontalAlignment="Center">
-                                <TextBlock Text="ZOLD" Style="{StaticResource SmallLabel}" HorizontalAlignment="Center"/>
+                                <TextBlock Text="ZÖLD" Style="{StaticResource SmallLabel}" HorizontalAlignment="Center"/>
                                 <TextBlock x:Name="TxtMineralG" Text="0" Style="{StaticResource BigValue}"
                                            Foreground="#4ADE80" HorizontalAlignment="Center" FontSize="22"/>
                             </StackPanel>
@@ -211,14 +211,14 @@
                             <Border x:Name="MineralProgress" Background="#E8632B" CornerRadius="4"
                                     Height="10" HorizontalAlignment="Left" Width="0"/>
                         </Grid>
-                        <TextBlock x:Name="TxtMineralPercent" Text="0 / 390 asvany (0%)"
+                        <TextBlock x:Name="TxtMineralPercent" Text="0 / 390 ásvány (0%)"
                                    Style="{StaticResource SmallLabel}" Margin="0,4,0,0"/>
                     </StackPanel>
                 </Border>
 
                 <Border Style="{StaticResource PanelBorder}">
                     <StackPanel>
-                        <TextBlock Text="ROVER STATUSZ" Style="{StaticResource PanelTitle}"/>
+                        <TextBlock Text="ROVER STÁTUSZ" Style="{StaticResource PanelTitle}"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -230,22 +230,22 @@
                                 <RowDefinition/>
                             </Grid.RowDefinitions>
                             <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,0,6">
-                                <TextBlock Text="POZICIO" Style="{StaticResource SmallLabel}"/>
+                                <TextBlock Text="POZÍCIÓ" Style="{StaticResource SmallLabel}"/>
                                 <TextBlock x:Name="TxtPosition" Text="(32, 34)" Foreground="#E8DDD3"
                                            FontSize="16" FontFamily="Consolas" FontWeight="Bold"/>
                             </StackPanel>
                             <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,0,0,6">
-                                <TextBlock Text="SEBESSEG" Style="{StaticResource SmallLabel}"/>
-                                <TextBlock x:Name="TxtSpeed" Text="Lassu (1 blokk/tick)"
+                                <TextBlock Text="SEBESSÉG" Style="{StaticResource SmallLabel}"/>
+                                <TextBlock x:Name="TxtSpeed" Text="Lassú (1 blokk/tick)"
                                            Foreground="#E8DDD3" FontSize="14" FontFamily="Consolas"/>
                             </StackPanel>
                             <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,0,6">
-                                <TextBlock Text="TEVEKENYSEG" Style="{StaticResource SmallLabel}"/>
+                                <TextBlock Text="TEVÉKENYSÉG" Style="{StaticResource SmallLabel}"/>
                                 <TextBlock x:Name="TxtAction" Text="Standby"
                                            Foreground="#F4A623" FontSize="14" FontWeight="SemiBold"/>
                             </StackPanel>
                             <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,0,0,6">
-                                <TextBlock Text="MEGTETT UT" Style="{StaticResource SmallLabel}"/>
+                                <TextBlock Text="MEGTETT ÚT" Style="{StaticResource SmallLabel}"/>
                                 <TextBlock x:Name="TxtDistance" Text="0 blokk"
                                            Foreground="#E8DDD3" FontSize="14" FontFamily="Consolas"/>
                             </StackPanel>
@@ -255,8 +255,8 @@
                                            Foreground="#E8DDD3" FontSize="14" FontFamily="Consolas"/>
                             </StackPanel>
                             <StackPanel Grid.Row="2" Grid.Column="1">
-                                <TextBlock Text="FAZIS VALTAS" Style="{StaticResource SmallLabel}"/>
-                                <TextBlock x:Name="TxtPhaseChange" Text="16.0 ora mulva"
+                                <TextBlock Text="FÁZISVÁLTÁS" Style="{StaticResource SmallLabel}"/>
+                                <TextBlock x:Name="TxtPhaseChange" Text="16.0 óra múlva"
                                            Foreground="#E8DDD3" FontSize="14" FontFamily="Consolas"/>
                             </StackPanel>
                         </Grid>
@@ -265,7 +265,7 @@
 
                 <Border Style="{StaticResource PanelBorder}" Height="180">
                     <StackPanel>
-                        <TextBlock Text="AKKUMULATOR TORTENETE" Style="{StaticResource PanelTitle}"/>
+                        <TextBlock Text="AKKUMULÁTOR TÖRTÉNETE" Style="{StaticResource PanelTitle}"/>
                         <lvc:CartesianChart x:Name="ChartBattery" Height="140"
                                             TooltipPosition="Hidden" LegendPosition="Hidden"/>
                     </StackPanel>
@@ -273,7 +273,7 @@
 
                 <Border Style="{StaticResource PanelBorder}" Height="180">
                     <StackPanel>
-                        <TextBlock Text="ASVANYGYUJTES KUMULATIV" Style="{StaticResource PanelTitle}"/>
+                        <TextBlock Text="ÁSVÁNYGYŰJTÉS KUMULATÍV" Style="{StaticResource PanelTitle}"/>
                         <lvc:CartesianChart x:Name="ChartMinerals" Height="140"
                                             TooltipPosition="Hidden" LegendPosition="Hidden"/>
                     </StackPanel>
@@ -281,7 +281,7 @@
 
                 <Border Style="{StaticResource PanelBorder}" Height="180">
                     <StackPanel>
-                        <TextBlock Text="SEBESSEG ES ENERGIA" Style="{StaticResource PanelTitle}"/>
+                        <TextBlock Text="SEBESSÉG ÉS ENERGIA" Style="{StaticResource PanelTitle}"/>
                         <lvc:CartesianChart x:Name="ChartSpeed" Height="140"
                                             TooltipPosition="Hidden" LegendPosition="Hidden"/>
                     </StackPanel>
@@ -289,7 +289,7 @@
 
                 <Border Style="{StaticResource PanelBorder}" Height="200">
                     <StackPanel>
-                        <TextBlock Text="ESEMENYNAPLO" Style="{StaticResource PanelTitle}"/>
+                        <TextBlock Text="ESEMÉNYNAPLÓ" Style="{StaticResource PanelTitle}"/>
                         <ListBox x:Name="LogList" Height="160" Background="Transparent"
                                  BorderThickness="0" Foreground="#E8DDD3" FontSize="11"
                                  FontFamily="Consolas" ScrollViewer.CanContentScroll="True">
