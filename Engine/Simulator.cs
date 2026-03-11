@@ -3,8 +3,15 @@ using MarsRover.Models;
 namespace MarsRover.Engine
 {
     /// <summary>
-    /// Mars Rover szimulációs motor – okos energiamenedzsmenttel,
-    /// adaptív újratervezéssel, éjszakai energiatakarékos móddal.
+    /// Mars Rover szimulációs motor v4
+    /// 
+    /// Fő változások:
+    /// - Agresszívebb nappali sebesség: Normal (2 lépés/tick, nettó +2) az alap
+    ///   Ha akku ≥80%: Fast (3 lépés, nettó -8, DE gyorsan halad + nappal feltölt)
+    /// - Éjszaka: Normal ha van akku (≥40%), mert -8/tick de 16 tick alatt max -128 → 
+    ///   ha 100%-ról indulsz éjszakát ~12 ticket bírod Normal-on
+    /// - Sebesség-szimuláció a tervezőben is Normal-t használ (nem slow-t!)
+    /// - Újratervezés CSAK ha elfogytak a célok, nem napfelkeltekor
     /// </summary>
     public class Simulator
     {
@@ -16,7 +23,6 @@ namespace MarsRover.Engine
         public const double SOLAR = 10.0;
         public const double STANDBY_DRAIN = 1.0;
         public const double MINING_DRAIN = 2.0;
-        private const int REPLAN_INTERVAL = 20; // tick-enként újratervez
 
         public MarsMap Map { get; }
         public int TotalHours { get; }
@@ -45,7 +51,6 @@ namespace MarsRover.Engine
         private int _targetIdx = 0;
         private bool _mining = false;
         private bool _returning = false;
-        private int _lastReplanTick = -999;
 
         public event Action<LogEntry>? OnTick;
         public event Action? OnDone;
@@ -71,14 +76,15 @@ namespace MarsRover.Engine
             }
         }
 
-        /// <summary>Első tervezés indítás előtt.</summary>
         public void PlanInitial()
         {
             SmartPlanner.ClearCache();
-            Replan();
+            _targets = SmartPlanner.Plan(Map, RoverPos, Collected,
+                TotalTicks - Tick, Battery, TickInCycle);
+            PlannedRoute = new List<Pos>(_targets);
+            _targetIdx = 0;
         }
 
-        /// <summary>Adaptív újratervezés: újraszámolja a hátralevő célokat.</summary>
         private void Replan()
         {
             _targets = SmartPlanner.Plan(Map, RoverPos, Collected,
@@ -87,10 +93,8 @@ namespace MarsRover.Engine
             _targetIdx = 0;
             _pathQ.Clear();
             _returning = false;
-            _lastReplanTick = Tick;
         }
 
-        /// <summary>Egy fél-órás tick szimulálása.</summary>
         public void Step()
         {
             if (Finished) return;
@@ -99,7 +103,6 @@ namespace MarsRover.Engine
             string ev = "";
             double energyBefore = Battery;
 
-            // Napszak váltás jelzés
             int ic = Tick % CYCLE_TICKS;
             if (ic == 0 && Tick > 0) ev += "Napfelkelte! ";
             if (ic == DAY_TICKS) ev += "Napnyugta! ";
@@ -117,46 +120,50 @@ namespace MarsRover.Engine
                     var ct = Map.Grid[RoverPos.Row, RoverPos.Col];
                     switch (ct)
                     {
-                        case CellType.MineralB: MinB++; ev += "Kék ásvány begyűjtve!"; break;
-                        case CellType.MineralY: MinY++; ev += "Sárga ásvány begyűjtve!"; break;
-                        case CellType.MineralG: MinG++; ev += "Zöld ásvány begyűjtve!"; break;
+                        case CellType.MineralB: MinB++; ev += "Kék!"; break;
+                        case CellType.MineralY: MinY++; ev += "Sárga!"; break;
+                        case CellType.MineralG: MinG++; ev += "Zöld!"; break;
                     }
                 }
                 EmitLog(ev, energyBefore);
                 return;
             }
 
-            // ── Periodikus újratervezés (ADAPTÍV AI) ──
-            if (!_returning && Tick - _lastReplanTick >= REPLAN_INTERVAL && _targetIdx > 0)
-            {
-                Replan();
-                ev += "AI újratervez... ";
-            }
-
-            // ── Éjszakai energiatakarékos mód ──
-            // Ha éjszaka van ÉS alacsony az energia ÉS hamarosan napfelkelte → várjunk
-            if (phase == DayPhase.Night && Battery < 25 && TicksToPhaseChange <= 6 && !_returning)
+            // ── Éjszaka + kritikusan alacsony akku + hamarosan napkelte → várakozás ──
+            if (phase == DayPhase.Night && Battery < 12 && TicksToPhaseChange <= 6 && !_returning)
             {
                 Action = RoverAction.WaitingForDawn;
                 ApplyEnergy(STANDBY_DRAIN, phase);
-                ev += "Napfelkeltére várakozás (energiatakarékos)";
+                ev += "Napkeltére vár";
                 EmitLog(ev, energyBefore);
                 return;
             }
 
-            // ── Sebesség választás ──
+            // ── Nappal + kritikus → töltés (1-2 tick elég) ──
+            if (phase == DayPhase.Day && Battery < 8 && !_returning)
+            {
+                Action = RoverAction.Charging;
+                ApplyEnergy(STANDBY_DRAIN, phase);
+                ev += "Töltés";
+                EmitLog(ev, energyBefore);
+                return;
+            }
+
+            // ── Sebesség ──
             SpeedLevel spd = PickSpeed(phase);
             Speed = spd;
             int stepsThisTick = (int)spd;
 
-            // ── Következő úticél keresése ──
+            // ── Következő célpont ──
             if (_pathQ.Count == 0 && !_returning)
             {
+                // Skip already collected
+                while (_targetIdx < _targets.Count && Collected.Contains(_targets[_targetIdx]))
+                    _targetIdx++;
+
                 if (_targetIdx < _targets.Count)
                 {
                     var target = _targets[_targetIdx];
-
-                    // Ellenőrzés: van elég idő+energia?
                     var pathTo = AStar.FindPath(Map, RoverPos, target);
                     var pathBack = AStar.FindPath(Map, target, Map.StartPos);
 
@@ -165,45 +172,52 @@ namespace MarsRover.Engine
                         int need = pathTo.Count + 1 + pathBack.Count;
                         int left = TotalTicks - Tick;
 
-                        if (need <= left - 2 && Battery > 8)
+                        if (need <= left - 2 && Battery > 3)
                         {
                             foreach (var p in pathTo) _pathQ.Enqueue(p);
-                            ev += $"Cél: ásvány #{TotalMin + 1} @ {target} ";
+                            ev += $"#{TotalMin + 1} @ {target} (d={pathTo.Count}) ";
                         }
                         else
                         {
-                            // Nem fér bele → újratervezés rövidebb listával
                             _targetIdx++;
-                            if (_targetIdx >= _targets.Count)
+                            // Próbáljuk a következőt is
+                            int tried = 0;
+                            while (_targetIdx < _targets.Count && tried < 5)
                             {
-                                GoHome(ref ev);
+                                if (Collected.Contains(_targets[_targetIdx])) { _targetIdx++; continue; }
+                                var t2 = _targets[_targetIdx];
+                                var p2 = AStar.FindPath(Map, RoverPos, t2);
+                                var pb2 = AStar.FindPath(Map, t2, Map.StartPos);
+                                if (p2 != null && pb2 != null && p2.Count + 1 + pb2.Count <= left - 2)
+                                {
+                                    foreach (var p in p2) _pathQ.Enqueue(p);
+                                    ev += $"#{TotalMin + 1} @ {t2} (d={p2.Count}) ";
+                                    break;
+                                }
+                                _targetIdx++;
+                                tried++;
                             }
+                            if (_pathQ.Count == 0 && _targetIdx >= _targets.Count)
+                                GoHome(ref ev);
                         }
                     }
                     else
                     {
-                        _targetIdx++; // elérhetetlen, skip
+                        _targetIdx++;
                     }
                 }
                 else
                 {
-                    // Nincs több célpont → de van idő? Újratervezés!
+                    // Nincs több cél – újratervezés
                     int ticksLeft = TotalTicks - Tick;
                     int distHome = SmartPlanner.CachedDist(Map, RoverPos, Map.StartPos);
-                    if (distHome == int.MaxValue) distHome = 50;
+                    if (distHome == int.MaxValue) distHome = 60;
 
                     if (ticksLeft > distHome + 10)
                     {
-                        // Van még idő, próbáljunk újabb ásványokat keresni
                         Replan();
-                        if (_targets.Count == 0)
-                        {
-                            GoHome(ref ev);
-                        }
-                        else
-                        {
-                            ev += "Újratervezett útvonal! ";
-                        }
+                        if (_targets.Count == 0) GoHome(ref ev);
+                        else ev += "Újratervez! ";
                     }
                     else
                     {
@@ -222,33 +236,22 @@ namespace MarsRover.Engine
                 Steps++;
                 done++;
 
-                // Ásvány elérve?
                 if (!_returning && Map.IsMineral(next) && !Collected.Contains(next))
                 {
+                    _mining = true;
                     if (_targetIdx < _targets.Count && next == _targets[_targetIdx])
-                    {
-                        _mining = true;
                         _targetIdx++;
-                        ev += $"Bányászás @ {next} ";
-                        break;
-                    }
-                    // Útba eső ásvány: ingyen begyűjtés!
-                    else
-                    {
-                        _mining = true;
-                        ev += $"Útba eső ásvány @ {next} ";
-                        break;
-                    }
+                    ev += $"Bányász @ {next} ";
+                    break;
                 }
 
                 if (_returning && next == Map.StartPos)
                 {
                     Home = true;
-                    ev += "Visszaérkezett a bázisra!";
+                    ev += "Bázis!";
                 }
             }
 
-            // ── Energia ──
             if (done > 0)
             {
                 Action = _returning ? RoverAction.Returning : RoverAction.Moving;
@@ -275,7 +278,7 @@ namespace MarsRover.Engine
             var ph = AStar.FindPath(Map, RoverPos, Map.StartPos);
             if (ph != null)
                 foreach (var p in ph) _pathQ.Enqueue(p);
-            ev += "Visszatérés a bázisra ";
+            ev += "Visszatérés ";
         }
 
         private void ApplyEnergy(double drain, DayPhase phase)
@@ -284,30 +287,49 @@ namespace MarsRover.Engine
             Battery = Math.Clamp(Battery - drain + charge, 0, MAX_BATT);
         }
 
+        /// <summary>
+        /// Agresszívebb sebesség-stratégia:
+        /// 
+        ///                  Fogy   Tölt   Nappali nettó   Éjszakai nettó
+        ///   Slow  (1 lép)   2     10        +8              -2
+        ///   Normal(2 lép)   8     10        +2              -8
+        ///   Fast  (3 lép)  18     10        -8             -18
+        /// 
+        /// Nappal:
+        ///   Normal az alap (nettó +2, tehát SOSEM fogy el nappal!)
+        ///   Fast ha akku ≥80% (nettó -8, de 3 lépés → gyorsabban jut célba)
+        ///   Slow CSAK ha akku <20% (feltöltés szükséges)
+        /// 
+        /// Éjszaka:
+        ///   Normal ha akku ≥50% (nettó -8, de éjszaka csak 16 tick → max -128 → elég)
+        ///   Slow ha akku <50% (nettó -2, biztonságos)
+        /// </summary>
         private SpeedLevel PickSpeed(DayPhase phase)
         {
-            // Visszatérésnél: gyorsítsunk ha kell
             if (_returning)
             {
                 int distHome = _pathQ.Count;
                 int ticksLeft = TotalTicks - Tick;
-                if (distHome > ticksLeft * 2 && Battery > 30) return SpeedLevel.Fast;
-                if (distHome > ticksLeft && Battery > 20) return SpeedLevel.Normal;
+                if (distHome > ticksLeft && Battery > 25) return SpeedLevel.Fast;
+                if (distHome > ticksLeft * 2 / 3 && Battery > 15) return SpeedLevel.Normal;
             }
-
-            if (Battery <= 12) return SpeedLevel.Slow;
 
             if (phase == DayPhase.Day)
             {
-                if (Battery >= 65) return SpeedLevel.Fast;
-                if (Battery >= 30) return SpeedLevel.Normal;
-                return SpeedLevel.Slow;
+                // Nappal: Normal nettó +2, tehát sosem fogy el!
+                if (Battery >= 80) return SpeedLevel.Fast;   // 3 lépés, nettó -8, de gyors
+                if (Battery >= 20) return SpeedLevel.Normal;  // 2 lépés, nettó +2
+                return SpeedLevel.Slow;                       // <20%: tölt +8/tick
             }
             else
             {
-                // Éjszaka: óvatos
-                if (Battery >= 75) return SpeedLevel.Normal;
-                return SpeedLevel.Slow;
+                // Éjszaka: 16 tick. Normal -8/tick = max -128 összesen
+                // Ha 100%-ról induljuk: 100 - 8*16 = 100-128 = negatív!
+                // De a nappali +2/tick 32 tickből +64-et ad → 100+64=164 kap → 100%
+                // Szóval ha 50%+: Normal biztonságos
+                if (Battery >= 50) return SpeedLevel.Normal;  // 2 lépés, nettó -8
+                if (Battery >= 20) return SpeedLevel.Slow;    // 1 lépés, nettó -2
+                return SpeedLevel.Slow;                       // védelem
             }
         }
 

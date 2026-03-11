@@ -1,254 +1,215 @@
 <Window x:Class="MarsRover.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="MARS ROVER 3D &#8211; Mission Control"
-        Width="1500" Height="950" MinWidth="1100" MinHeight="700"
+        xmlns:skia="clr-namespace:SkiaSharp.Views.WPF;assembly=SkiaSharp.Views.WPF"
+        Title="MARS ROVER // TERMINAL v2.0"
+        Width="1500" Height="920" MinWidth="1100" MinHeight="700"
         WindowStartupLocation="CenterScreen"
-        Background="#0B0910" Loaded="OnLoaded"
+        Background="#0A0A0A" Loaded="OnLoaded"
         KeyDown="OnKeyDown">
 
     <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="210"/>
-        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="420"/>
+        </Grid.ColumnDefinitions>
 
-        <!-- ═══ FELSŐ: 3D TÉRKÉP ═══ -->
-        <Grid Grid.Row="0">
-            <Viewport3D x:Name="Viewport" ClipToBounds="True">
-                <Viewport3D.Camera>
-                    <PerspectiveCamera x:Name="Camera"
-                        Position="25, 45, 55"
-                        LookDirection="-0.4, -0.7, -0.6"
-                        UpDirection="0, 1, 0"
-                        FieldOfView="50"/>
-                </Viewport3D.Camera>
+        <!-- ═══ BAL: TÉRKÉP ═══ -->
+        <Grid Grid.Column="0">
+            <skia:SKElement x:Name="MapCanvas" PaintSurface="OnPaintSurface"
+                            MouseWheel="OnMapMouseWheel"
+                            MouseLeftButtonDown="OnMapMouseDown"
+                            MouseLeftButtonUp="OnMapMouseUp"
+                            MouseMove="OnMapMouseMove"/>
 
-                <ModelVisual3D>
-                    <ModelVisual3D.Content>
-                        <DirectionalLight Color="#FFEEDD" Direction="-0.5,-1,-0.3"/>
-                    </ModelVisual3D.Content>
-                </ModelVisual3D>
-                <ModelVisual3D>
-                    <ModelVisual3D.Content>
-                        <AmbientLight Color="#332830"/>
-                    </ModelVisual3D.Content>
-                </ModelVisual3D>
-
-                <ModelVisual3D x:Name="SceneRoot"/>
-            </Viewport3D>
-
-            <!-- Overlay: HUD elemek a 3D felett -->
-            <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="16,12"
-                    Background="#CC0B0910" CornerRadius="6" Padding="12,6">
+            <!-- HUD: Bal felső -->
+            <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="14,12"
+                    Background="#EE0A0A0A" CornerRadius="3" Padding="12,6">
                 <StackPanel Orientation="Horizontal">
-                    <Ellipse Width="12" Height="12" Margin="0,0,8,0" VerticalAlignment="Center">
-                        <Ellipse.Fill>
-                            <RadialGradientBrush>
-                                <GradientStop Color="#FF6B35" Offset="0"/>
-                                <GradientStop Color="#CC3500" Offset="1"/>
-                            </RadialGradientBrush>
-                        </Ellipse.Fill>
-                    </Ellipse>
-                    <TextBlock Text="MARS ROVER 3D" FontSize="16" FontWeight="Bold" FontFamily="Consolas"
-                               Foreground="#FF6B35" VerticalAlignment="Center"/>
-                    <TextBlock Text="  //  VADÁSZ DÉNES VERSENY 2026" FontSize="10" FontFamily="Consolas"
-                               Foreground="#5A4F6B" VerticalAlignment="Center" Margin="4,2,0,0"/>
+                    <TextBlock Text="█" Foreground="#33FF33" FontSize="16" FontFamily="Consolas" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="MARS ROVER" FontSize="20" FontWeight="Bold" FontFamily="Consolas"
+                               Foreground="#33FF33" VerticalAlignment="Center"/>
+                    <TextBlock Text=" // VADÁSZ DÉNES 2026" FontSize="12" FontFamily="Consolas"
+                               Foreground="#444444" VerticalAlignment="Center" Margin="10,2,0,0"/>
                 </StackPanel>
             </Border>
 
-            <!-- Jobb felső: napszak + idő -->
-            <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="16,12"
-                    Background="#CC0B0910" CornerRadius="6" Padding="12,6">
+            <!-- HUD: Jobb felső – napszak -->
+            <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="14,12"
+                    Background="#EE0A0A0A" CornerRadius="3" Padding="12,6">
                 <StackPanel Orientation="Horizontal">
-                    <Ellipse x:Name="PhaseOrb" Width="10" Height="10" Fill="#FACC15" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                    <TextBlock x:Name="TxtPhase" Text="NAPPAL" FontSize="12" FontWeight="Bold"
-                               FontFamily="Consolas" Foreground="#FACC15" VerticalAlignment="Center"/>
-                    <TextBlock x:Name="TxtClock" Text="  T+0.0h / 72h" FontSize="12"
-                               FontFamily="Consolas" Foreground="#7B6F90" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                    <TextBlock x:Name="TxtPhaseIcon" Text="☀" FontSize="18" FontFamily="Consolas"
+                               Foreground="#FFD633" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBlock x:Name="TxtPhase" Text="NAPPAL" FontSize="16" FontWeight="Bold"
+                               FontFamily="Consolas" Foreground="#FFD633" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="TxtClock" Text="  T+0.0h" FontSize="16"
+                               FontFamily="Consolas" Foreground="#666666" VerticalAlignment="Center" Margin="12,0,0,0"/>
                 </StackPanel>
             </Border>
 
-            <!-- Bal alsó: kamera info -->
-            <Border HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="16,0,0,12"
-                    Background="#CC0B0910" CornerRadius="6" Padding="10,4">
-                <TextBlock Text="WASD: kamera | Q/E: forgatás | +/-: zoom" FontSize="9"
-                           FontFamily="Consolas" Foreground="#3D3550"/>
+            <!-- HUD: Bal alsó -->
+            <Border HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="14,0,0,12"
+                    Background="#EE0A0A0A" CornerRadius="3" Padding="10,5">
+                <TextBlock Text="SCROLL: zoom  |  EGÉR: húzás  |  WASD: mozgatás" FontSize="12"
+                           FontFamily="Consolas" Foreground="#383838"/>
             </Border>
 
             <!-- Éjszaka overlay -->
-            <Border x:Name="NightOverlay" IsHitTestVisible="False" Visibility="Collapsed">
+            <Border x:Name="NightOverlay" IsHitTestVisible="False" Opacity="0">
                 <Border.Background>
-                    <SolidColorBrush Color="#001030" Opacity="0.4"/>
+                    <SolidColorBrush Color="#000820" Opacity="0.35"/>
                 </Border.Background>
             </Border>
         </Grid>
 
-        <!-- ═══ ALSÓ: DASHBOARD ═══ -->
-        <Border Grid.Row="1" Background="#0F0C14" BorderBrush="#1E1830" BorderThickness="0,1,0,0">
-            <Grid Margin="12,8">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="200"/>
-                    <ColumnDefinition Width="200"/>
-                    <ColumnDefinition Width="200"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="250"/>
-                </Grid.ColumnDefinitions>
+        <!-- ═══ JOBB: PANEL ═══ -->
+        <Border Grid.Column="1" Background="#0D0D0D" BorderBrush="#1C1C1C" BorderThickness="2,0,0,0">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="18,16">
 
-                <!-- Vezérlő panel -->
-                <StackPanel Grid.Column="0" Margin="0,0,10,0">
-                    <TextBlock Text="// VEZÉRLÉS" Foreground="#5A4F6B" FontSize="9" FontWeight="Bold"
-                               FontFamily="Consolas" Margin="0,0,0,6"/>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                        <TextBlock Text="Óra:" Foreground="#7B6F90" FontSize="11" FontFamily="Consolas"
-                                   VerticalAlignment="Center" Margin="0,0,4,0"/>
-                        <TextBox x:Name="TxtHours" Width="40" Text="72" FontSize="12" FontFamily="Consolas"
-                                 Background="#1A1525" Foreground="#E0D8E8" BorderBrush="#2A1F3D"
-                                 VerticalContentAlignment="Center" HorizontalContentAlignment="Center" Padding="2"/>
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                        <TextBlock Text="Tempó:" Foreground="#7B6F90" FontSize="10" FontFamily="Consolas"
-                                   VerticalAlignment="Center" Margin="0,0,4,0"/>
-                        <Slider x:Name="SldSpeed" Width="80" Minimum="20" Maximum="600" Value="100"
-                                VerticalAlignment="Center"/>
-                        <TextBlock x:Name="TxtTempo" Text="100ms" Foreground="#7B6F90" FontSize="9"
-                                   FontFamily="Consolas" VerticalAlignment="Center" Margin="4,0,0,0"/>
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal">
-                        <Button x:Name="BtnGo" Content="INDÍTÁS" Padding="8,4" Margin="0,0,3,0"
-                                FontFamily="Consolas" FontWeight="Bold" FontSize="11"
-                                Background="#FF6B35" Foreground="White" BorderThickness="0"
-                                Click="BtnGo_Click" Cursor="Hand"/>
-                        <Button x:Name="BtnPause" Content="||" Padding="6,4" Margin="0,0,3,0"
-                                FontFamily="Consolas" FontSize="11" IsEnabled="False"
-                                Background="#1E1830" Foreground="#7B6F90" BorderThickness="0"
-                                Click="BtnPause_Click" Cursor="Hand"/>
-                        <Button x:Name="BtnReset" Content="&#8634;" Padding="6,4" Margin="0,0,3,0"
-                                FontFamily="Consolas" FontSize="13"
-                                Background="#1E1830" Foreground="#7B6F90" BorderThickness="0"
-                                Click="BtnReset_Click" Cursor="Hand"/>
-                        <Button x:Name="BtnCsv" Content="CSV" Padding="6,4" IsEnabled="False"
-                                FontFamily="Consolas" FontSize="10"
-                                Background="#1E1830" Foreground="#7B6F90" BorderThickness="0"
-                                Click="BtnCsv_Click" Cursor="Hand"/>
-                    </StackPanel>
-                </StackPanel>
+                    <!-- RENDSZER -->
+                    <TextBlock Text="RENDSZER" Foreground="#33FF33" FontSize="14" FontWeight="Bold" FontFamily="Consolas" Margin="0,0,0,10"/>
 
-                <!-- Akkumulátor -->
-                <StackPanel Grid.Column="1" Margin="10,0">
-                    <TextBlock Text="// AKKUMULÁTOR" Foreground="#5A4F6B" FontSize="9" FontWeight="Bold"
-                               FontFamily="Consolas" Margin="0,0,0,4"/>
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock x:Name="TxtBatt" Text="100" FontSize="36" FontWeight="Bold"
-                                   FontFamily="Consolas" Foreground="#4ADE80"/>
-                        <TextBlock Text="%" FontSize="14" Foreground="#3D3550" FontFamily="Consolas"
-                                   VerticalAlignment="Bottom" Margin="1,0,0,6"/>
-                        <TextBlock x:Name="TxtDelta" Text="+0" FontSize="12" FontFamily="Consolas"
-                                   Foreground="#4ADE80" VerticalAlignment="Bottom" Margin="8,0,0,6"/>
-                    </StackPanel>
-                    <Border Background="#1A1525" CornerRadius="3" Height="8" Margin="0,2,0,0">
-                        <Border x:Name="BarBatt" Background="#4ADE80" CornerRadius="3"
-                                HorizontalAlignment="Left" Width="180"/>
-                    </Border>
-                    <TextBlock x:Name="TxtBattInfo" Text="" Foreground="#3D3550" FontSize="8"
-                               FontFamily="Consolas" Margin="0,2,0,0"/>
-                </StackPanel>
-
-                <!-- Ásványok -->
-                <StackPanel Grid.Column="2" Margin="10,0">
-                    <TextBlock Text="// ÁSVÁNYOK" Foreground="#5A4F6B" FontSize="9" FontWeight="Bold"
-                               FontFamily="Consolas" Margin="0,0,0,4"/>
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock x:Name="TxtMinTotal" Text="0" FontSize="36" FontWeight="Bold"
-                                   FontFamily="Consolas" Foreground="#FF6B35"/>
-                        <TextBlock Text="db" FontSize="11" Foreground="#3D3550" FontFamily="Consolas"
-                                   VerticalAlignment="Bottom" Margin="3,0,0,8"/>
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                        <Border Background="#386BC0" CornerRadius="2" Padding="4,1" Margin="0,0,4,0">
-                            <TextBlock x:Name="TxtMinB" Text="K:0" FontSize="10" FontFamily="Consolas" Foreground="White"/>
-                        </Border>
-                        <Border Background="#C0A010" CornerRadius="2" Padding="4,1" Margin="0,0,4,0">
-                            <TextBlock x:Name="TxtMinY" Text="S:0" FontSize="10" FontFamily="Consolas" Foreground="White"/>
-                        </Border>
-                        <Border Background="#30A050" CornerRadius="2" Padding="4,1">
-                            <TextBlock x:Name="TxtMinG" Text="Z:0" FontSize="10" FontFamily="Consolas" Foreground="White"/>
-                        </Border>
-                    </StackPanel>
-                    <Border Background="#1A1525" CornerRadius="3" Height="6" Margin="0,4,0,0">
-                        <Border x:Name="BarMin" Background="#FF6B35" CornerRadius="3"
-                                HorizontalAlignment="Left" Width="0"/>
-                    </Border>
-                    <TextBlock x:Name="TxtMinPct" Text="0/390" Foreground="#3D3550" FontSize="8"
-                               FontFamily="Consolas" Margin="0,1,0,0"/>
-                </StackPanel>
-
-                <!-- Rover telemetria -->
-                <StackPanel Grid.Column="3" Margin="10,0">
-                    <TextBlock Text="// TELEMETRIA" Foreground="#5A4F6B" FontSize="9" FontWeight="Bold"
-                               FontFamily="Consolas" Margin="0,0,0,4"/>
-                    <Grid>
+                    <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="ÓRA " Foreground="#888888" FontSize="16" FontFamily="Consolas" FontWeight="Bold" VerticalAlignment="Center"/>
+                        <TextBox Grid.Column="1" x:Name="TxtHours" Width="60" Text="72" Style="{StaticResource CrtTextBox}" FontSize="18"/>
+                        <TextBlock Grid.Column="2" Text=" h" Foreground="#555555" FontSize="16" FontFamily="Consolas" VerticalAlignment="Center"/>
+                    </Grid>
+
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="SPD " Foreground="#888888" FontSize="16" FontFamily="Consolas" FontWeight="Bold" VerticalAlignment="Center"/>
+                        <Slider Grid.Column="1" x:Name="SldSpeed" Minimum="20" Maximum="600" Value="80" VerticalAlignment="Center" Margin="4,0,8,0"/>
+                        <TextBlock Grid.Column="2" x:Name="TxtTempo" Text="80ms" Foreground="#666666" FontSize="14" FontFamily="Consolas" VerticalAlignment="Center"/>
+                    </Grid>
+
+                    <WrapPanel Margin="0,0,0,16">
+                        <Button x:Name="BtnGo" Content="▶ START" Style="{StaticResource CrtButton}"
+                                Margin="0,0,6,0" FontSize="15" Padding="16,8" Click="BtnGo_Click"/>
+                        <Button x:Name="BtnPause" Content="║║" Style="{StaticResource CrtButtonAmber}"
+                                IsEnabled="False" Margin="0,0,6,0" FontSize="15" Padding="12,8" Click="BtnPause_Click"/>
+                        <Button x:Name="BtnReset" Content="↺ RST" Style="{StaticResource CrtButton}"
+                                Margin="0,0,6,0" FontSize="14" Padding="12,8" Click="BtnReset_Click"/>
+                        <Button x:Name="BtnCsv" Content="CSV" Style="{StaticResource CrtButton}"
+                                IsEnabled="False" FontSize="14" Padding="12,8" Click="BtnCsv_Click"/>
+                    </WrapPanel>
+
+                    <!-- Separator -->
+                    <Border Height="1" Background="#1C1C1C" Margin="0,0,0,16"/>
+
+                    <!-- AKKUMULÁTOR -->
+                    <TextBlock Text="AKKUMULÁTOR" Foreground="#33FF33" FontSize="14" FontWeight="Bold" FontFamily="Consolas" Margin="0,0,0,6"/>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                        <TextBlock x:Name="TxtBatt" Text="100" FontSize="48" FontWeight="Bold"
+                                   FontFamily="Consolas" Foreground="#33FF33"/>
+                        <StackPanel VerticalAlignment="Bottom" Margin="4,0,0,8">
+                            <TextBlock Text="%" FontSize="20" Foreground="#1A8C1A" FontFamily="Consolas"/>
+                        </StackPanel>
+                        <TextBlock x:Name="TxtDelta" Text="+0.0" FontSize="18" FontFamily="Consolas"
+                                   Foreground="#33FF33" VerticalAlignment="Bottom" Margin="14,0,0,10"/>
+                    </StackPanel>
+
+                    <TextBlock x:Name="TxtBattBar" FontSize="15" FontFamily="Consolas" Foreground="#33FF33"
+                               Text="[████████████████████] 100%" Margin="0,0,0,4"/>
+
+                    <TextBlock x:Name="TxtBattInfo" Text="" Foreground="#555555" FontSize="13"
+                               FontFamily="Consolas" Margin="0,0,0,12"/>
+
+                    <!-- Separator -->
+                    <Border Height="1" Background="#1C1C1C" Margin="0,0,0,16"/>
+
+                    <!-- ÁSVÁNYOK -->
+                    <TextBlock Text="ÁSVÁNYOK" Foreground="#FFB833" FontSize="14" FontWeight="Bold" FontFamily="Consolas" Margin="0,0,0,6"/>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                        <TextBlock x:Name="TxtMinTotal" Text="0" FontSize="48" FontWeight="Bold"
+                                   FontFamily="Consolas" Foreground="#FFB833"/>
+                        <TextBlock Text=" db" FontSize="18" Foreground="#8C6600" FontFamily="Consolas"
+                                   VerticalAlignment="Bottom" Margin="4,0,0,8"/>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                        <TextBlock x:Name="TxtMinB" Text="KÉK:0" FontSize="16" FontFamily="Consolas" Foreground="#4499FF" FontWeight="Bold" Margin="0,0,16,0"/>
+                        <TextBlock x:Name="TxtMinY" Text="SÁR:0" FontSize="16" FontFamily="Consolas" Foreground="#FFD633" FontWeight="Bold" Margin="0,0,16,0"/>
+                        <TextBlock x:Name="TxtMinG" Text="ZÖL:0" FontSize="16" FontFamily="Consolas" Foreground="#44FF88" FontWeight="Bold"/>
+                    </StackPanel>
+
+                    <TextBlock x:Name="TxtMinBar" FontSize="15" FontFamily="Consolas" Foreground="#FFB833"
+                               Text="[░░░░░░░░░░░░░░░░░░░░] 0/390" Margin="0,0,0,12"/>
+
+                    <!-- Separator -->
+                    <Border Height="1" Background="#1C1C1C" Margin="0,0,0,16"/>
+
+                    <!-- TELEMETRIA -->
+                    <TextBlock Text="TELEMETRIA" Foreground="#888888" FontSize="14" FontWeight="Bold" FontFamily="Consolas" Margin="0,0,0,8"/>
+
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
-                            <RowDefinition/>
-                            <RowDefinition/>
-                            <RowDefinition/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
-                        <StackPanel Grid.Row="0" Grid.Column="0">
-                            <TextBlock Text="POS" Foreground="#3D3550" FontSize="8" FontFamily="Consolas"/>
-                            <TextBlock x:Name="TxtPos" Text="(32,34)" Foreground="#E0D8E8" FontSize="12" FontWeight="Bold" FontFamily="Consolas"/>
-                        </StackPanel>
-                        <StackPanel Grid.Row="0" Grid.Column="1">
-                            <TextBlock Text="SPD" Foreground="#3D3550" FontSize="8" FontFamily="Consolas"/>
-                            <TextBlock x:Name="TxtSpd" Text="LASSÚ" Foreground="#E0D8E8" FontSize="12" FontFamily="Consolas"/>
-                        </StackPanel>
-                        <StackPanel Grid.Row="0" Grid.Column="2">
-                            <TextBlock Text="AKCIÓ" Foreground="#3D3550" FontSize="8" FontFamily="Consolas"/>
-                            <TextBlock x:Name="TxtAct" Text="STANDBY" Foreground="#FF6B35" FontSize="11" FontWeight="Bold" FontFamily="Consolas"/>
-                        </StackPanel>
-                        <StackPanel Grid.Row="1" Grid.Column="0">
-                            <TextBlock Text="DIST" Foreground="#3D3550" FontSize="8" FontFamily="Consolas"/>
-                            <TextBlock x:Name="TxtDist" Text="0" Foreground="#E0D8E8" FontSize="12" FontFamily="Consolas"/>
-                        </StackPanel>
-                        <StackPanel Grid.Row="1" Grid.Column="1">
-                            <TextBlock Text="SOL" Foreground="#3D3550" FontSize="8" FontFamily="Consolas"/>
-                            <TextBlock x:Name="TxtSol" Text="1" Foreground="#E0D8E8" FontSize="12" FontFamily="Consolas"/>
-                        </StackPanel>
-                        <StackPanel Grid.Row="1" Grid.Column="2">
-                            <TextBlock Text="FÁZIS" Foreground="#3D3550" FontSize="8" FontFamily="Consolas"/>
-                            <TextBlock x:Name="TxtPhChg" Text="16.0h" Foreground="#E0D8E8" FontSize="12" FontFamily="Consolas"/>
-                        </StackPanel>
-                    </Grid>
-                </StackPanel>
 
-                <!-- Napló -->
-                <Border Grid.Column="4" Background="#12101A" CornerRadius="5" Padding="6,4" Margin="10,0,0,0">
-                    <StackPanel>
-                        <TextBlock Text="// NAPLÓ" Foreground="#5A4F6B" FontSize="9" FontWeight="Bold"
-                                   FontFamily="Consolas" Margin="0,0,0,3"/>
-                        <ListBox x:Name="LogBox" Height="150" Background="Transparent"
-                                 BorderThickness="0" FontSize="9" FontFamily="Consolas"
-                                 Foreground="#6A5F80" ScrollViewer.CanContentScroll="True">
+                        <TextBlock Grid.Row="0" Grid.Column="0" FontSize="15" FontFamily="Consolas" Margin="0,3">
+                            <Run Text="POS " Foreground="#666666"/><Run x:Name="RunPos" Text="(32,34)" Foreground="#DDDDDD" FontWeight="Bold"/>
+                        </TextBlock>
+                        <TextBlock Grid.Row="0" Grid.Column="1" FontSize="15" FontFamily="Consolas" Margin="0,3">
+                            <Run Text="SPD " Foreground="#666666"/><Run x:Name="RunSpd" Text="LASSÚ" Foreground="#DDDDDD" FontWeight="Bold"/>
+                        </TextBlock>
+                        <TextBlock Grid.Row="1" Grid.Column="0" FontSize="15" FontFamily="Consolas" Margin="0,3">
+                            <Run Text="ACT " Foreground="#666666"/><Run x:Name="RunAct" Text="STANDBY" Foreground="#FFB833" FontWeight="Bold"/>
+                        </TextBlock>
+                        <TextBlock Grid.Row="1" Grid.Column="1" FontSize="15" FontFamily="Consolas" Margin="0,3">
+                            <Run Text="DST " Foreground="#666666"/><Run x:Name="RunDist" Text="0" Foreground="#DDDDDD" FontWeight="Bold"/>
+                        </TextBlock>
+                        <TextBlock Grid.Row="2" Grid.Column="0" FontSize="15" FontFamily="Consolas" Margin="0,3">
+                            <Run Text="SOL " Foreground="#666666"/><Run x:Name="RunSol" Text="1" Foreground="#DDDDDD" FontWeight="Bold"/>
+                        </TextBlock>
+                        <TextBlock Grid.Row="2" Grid.Column="1" FontSize="15" FontFamily="Consolas" Margin="0,3">
+                            <Run Text="PHZ " Foreground="#666666"/><Run x:Name="RunPhChg" Text="16.0h" Foreground="#DDDDDD" FontWeight="Bold"/>
+                        </TextBlock>
+                    </Grid>
+
+                    <!-- Separator -->
+                    <Border Height="1" Background="#1C1C1C" Margin="0,0,0,16"/>
+
+                    <!-- NAPLÓ -->
+                    <TextBlock Text="NAPLÓ" Foreground="#1A8C1A" FontSize="14" FontWeight="Bold" FontFamily="Consolas" Margin="0,0,0,6"/>
+
+                    <Border Background="#080808" CornerRadius="3" Padding="8,6">
+                        <ListBox x:Name="LogBox" Height="180" Background="Transparent"
+                                 BorderThickness="0" FontSize="13" FontFamily="Consolas"
+                                 Foreground="#1A8C1A" ScrollViewer.CanContentScroll="True">
                             <ListBox.ItemContainerStyle>
                                 <Style TargetType="ListBoxItem">
-                                    <Setter Property="Padding" Value="2,0"/>
+                                    <Setter Property="Padding" Value="2,2"/>
                                     <Setter Property="Background" Value="Transparent"/>
+                                    <Setter Property="Foreground" Value="#1A8C1A"/>
                                 </Style>
                             </ListBox.ItemContainerStyle>
                         </ListBox>
-                    </StackPanel>
-                </Border>
-            </Grid>
-        </Border>
+                    </Border>
 
-        <!-- Státuszsor -->
-        <Border Grid.Row="1" VerticalAlignment="Bottom" Margin="12,0,12,4">
-            <TextBlock x:Name="TxtStatus" Text="// KÉSZ. NYOMD MEG AZ INDÍTÁS GOMBOT."
-                       Foreground="#3D3550" FontSize="9" FontFamily="Consolas"/>
+                    <!-- Státusz -->
+                    <TextBlock x:Name="TxtStatus" Margin="0,14,0,0"
+                               Text="> KÉSZ. NYOMD MEG A START GOMBOT._"
+                               Foreground="#33FF33" FontSize="14" FontFamily="Consolas" TextWrapping="Wrap" FontWeight="Bold"/>
+                </StackPanel>
+            </ScrollViewer>
         </Border>
     </Grid>
 </Window>

@@ -1,222 +1,157 @@
-# Mars Rover Útvonaltervező Algoritmus
+# Mars Rover Útvonaltervező Algoritmus v3
 ## Vadász Dénes Informatika Verseny 2026 – Programozói Kategória
 
 ---
 
 ## 1. Áttekintés
 
-Az útvonaltervező rendszer három fő komponensből áll:
+A rendszer három fő fázisból áll:
 
-1. **A\* pathfinder** – akadálykerülő legrövidebb útvonal keresés
-2. **Greedy Nearest Neighbor + 2-opt** – ásványgyűjtési sorrend optimalizálás
-3. **Adaptív sebességvezérlő** – energiahatékony mozgásstratégia
+1. **BFS távolság-mátrix**: Minden ásvány + start + bázis párra kiszámolja a legrövidebb utat
+2. **Klaszter-TSP**: DBSCAN klaszterezés → klaszter-sorrend → klaszteren belüli NN → 2-opt + or-opt
+3. **Energia-szimuláció**: Precíz feasibility ellenőrzés a sebesség-stratégiával
 
 ---
 
-## 2. A\* Keresés (Legrövidebb Út)
-
-### Pszeudokód
+## 2. A* Keresés (8-irányú, Chebyshev-heurisztika)
 
 ```
 FUNCTION A_Star(térkép, start, cél):
-    nyílt_halmaz ← prioritási_sor()
-    zárt_halmaz ← üres_halmaz()
-    g_költség[start] ← 0
-    nyílt_halmaz.hozzáad(start, heurisztika(start, cél))
+    nyílt ← prioritási_sor()
+    zárt ← halmaz()
+    g[start] ← 0
+    nyílt.add(start, heurisztika(start, cél))
 
-    WHILE nyílt_halmaz NEM üres:
-        aktuális ← nyílt_halmaz.kivesz_legkisebb()
-
-        IF aktuális == cél:
-            RETURN útvonal_visszafejtés(aktuális)
-
-        zárt_halmaz.hozzáad(aktuális)
-
-        FOR EACH szomszéd IN 8_szomszéd(aktuális):  // átlós is
-            IF szomszéd ∈ zárt_halmaz OR szomszéd == akadály:
-                CONTINUE
-
-            tentative_g ← g_költség[aktuális] + 1
-
-            IF tentative_g < g_költség[szomszéd]:
-                szülő[szomszéd] ← aktuális
-                g_költség[szomszéd] ← tentative_g
-                f ← tentative_g + heurisztika(szomszéd, cél)
-                nyílt_halmaz.hozzáad(szomszéd, f)
-
+    WHILE nyílt nem üres:
+        akt ← nyílt.kivesz_min()
+        IF akt == cél: RETURN visszafejt(akt)
+        zárt.add(akt)
+        FOR szomszéd IN 8_irány(akt):
+            IF szomszéd ∈ zárt OR fal: SKIP
+            tg ← g[akt] + 1
+            IF tg < g[szomszéd]:
+                szülő[szomszéd] ← akt
+                g[szomszéd] ← tg
+                nyílt.add(szomszéd, tg + h(szomszéd, cél))
     RETURN nincs_út
-```
 
-### Heurisztika
-**Chebyshev-távolság** (8-irányú mozgáshoz admissible):
-```
-h(a, b) = max(|a.sor - b.sor|, |a.oszlop - b.oszlop|)
+h(a,b) = max(|a.sor - b.sor|, |a.oszlop - b.oszlop|)   // Chebyshev
 ```
 
 ---
 
-## 3. Ásványgyűjtési Sorrend Optimalizálás
+## 3. BFS Távolság-mátrix
 
-### 3.1 Greedy Nearest Neighbor
-
-```
-FUNCTION Tervez_Gyűjtés(térkép, időkeret):
-    ásványok ← térkép.összes_ásvány()
-    sorrend ← üres_lista()
-    aktuális ← start_pozíció
-    maradék_tick ← időkeret × 2  // fél-órás tickek
-
-    WHILE van_ásvány ÉS van_idő:
-        legjobb ← NULL
-        legjobb_táv ← ∞
-
-        FOR EACH ásvány IN maradék_ásványok:
-            táv_oda ← A_Star_távolság(aktuális, ásvány)
-            táv_vissza ← A_Star_távolság(ásvány, start)
-
-            // Elég idő van eljutni + bányászni + visszajutni?
-            szükséges_tick ← táv_oda + 1 + táv_vissza
-            IF szükséges_tick ≤ maradék_tick ÉS táv_oda < legjobb_táv:
-                legjobb ← ásvány
-                legjobb_táv ← táv_oda
-
-        IF legjobb == NULL:
-            BREAK
-
-        sorrend.hozzáad(legjobb)
-        maradék_ásványok.töröl(legjobb)
-        maradék_tick -= (legjobb_táv + 1)
-        aktuális ← legjobb
-
-    RETURN 2_opt_javítás(sorrend)
-```
-
-### 3.2 2-opt Lokális Javítás
-
-A Greedy sorrend nem garantáltan optimális, ezért 2-opt szomszédsági
-kereséssel javítjuk:
+Egyetlen BFS-ből megkapjuk egy pontból az összes többi ásvány távolságát.
+Ez O(N) a térkép-méretben, szemben az A* O(N·log N)-jével.
 
 ```
-FUNCTION 2_opt_javítás(sorrend):
-    javult ← IGAZ
+FUNCTION BFS_Distances(térkép, start, célok):
+    dist[start] ← 0
+    sor ← [start]
+    WHILE sor nem üres:
+        akt ← sor.kivesz()
+        FOR szomszéd IN 8_irány(akt):
+            IF szomszéd nincs dist-ben:
+                dist[szomszéd] ← dist[akt] + 1
+                sor.add(szomszéd)
+    RETURN dist
+```
 
-    WHILE javult:
-        javult ← HAMIS
-        FOR i ← 0 TO |sorrend| - 2:
-            FOR j ← i + 2 TO |sorrend| - 1:
-                előző_i ← (i == 0) ? start : sorrend[i-1]
-                követő_j ← (j == utolsó) ? start : sorrend[j+1]
+Ezt minden fontos pontból (ásványok + start + bázis) lefuttatjuk → teljes távolság-mátrix.
 
-                régi_költség ← táv(előző_i, sorrend[i]) + táv(sorrend[j], követő_j)
-                új_költség   ← táv(előző_i, sorrend[j]) + táv(sorrend[i], követő_j)
+---
 
-                IF új_költség < régi_költség:
-                    megfordít(sorrend, i, j)
-                    javult ← IGAZ
+## 4. DBSCAN Klaszterezés (BFS-távolság alapú)
 
+A korábbi Chebyshev-alapú klaszterezés helyett BFS-távolságot használunk,
+ami figyelembe veszi a falakat!
+
+```
+FUNCTION Klaszterezés(ásványok, küszöb=8):
+    Union-Find struktúra inicializálás
+    FOR minden (i, j) ásványpár:
+        IF BFS_távolság(i, j) ≤ küszöb:
+            Union(i, j)
+    RETURN csoportosítás a Union-Find szerint
+```
+
+---
+
+## 5. Klaszter-TSP Sorrend
+
+### 5.1 Klaszter-sorrend (Greedy Nearest Cluster)
+
+```
+FUNCTION Klaszter_Sorrend(klaszterek, start, bázis):
+    sorrend ← []
+    akt ← start
+    WHILE van klaszter:
+        legjobb ← min_távolságú klaszter (legközelebbi pont alapján)
+        sorrend.add(legjobb)
+        akt ← legjobb kilépő pontja
     RETURN sorrend
 ```
 
----
+### 5.2 Klaszteren belüli sorrend (Nearest Neighbor)
 
-## 4. Adaptív Sebességvezérlő
+Minden klaszteren belül egyszerű nearest-neighbor.
 
-A rover sebességét minden lépésben az aktuális helyzet alapján választjuk:
+### 5.3 Globális 2-opt + Or-opt javítás
 
-```
-FUNCTION Sebesség_Választás(akkumulátor, napszak):
-    IF akkumulátor ≤ 15%:
-        RETURN Lassú  // 1 blokk/tick, E = 2
+A teljes útvonalon (klaszter-határokon átívelő javítás is lehetséges):
 
-    IF napszak == Nappal:
-        IF akkumulátor ≥ 60%: RETURN Gyors   // 3 blokk/tick, E = 18, töltés +10
-        IF akkumulátor ≥ 30%: RETURN Normál  // 2 blokk/tick, E = 8, töltés +10
-        RETURN Lassú
-
-    ELSE:  // Éjszaka – nincs töltés!
-        IF akkumulátor ≥ 70%: RETURN Normál
-        RETURN Lassú
-```
-
-### Energiamérleg (fél-óránként):
-
-| Sebesség | Fogyasztás (E=k·v²) | Nappal nettó | Éjszaka nettó |
-|----------|---------------------|--------------|---------------|
-| Lassú    | 2                   | +8           | -2            |
-| Normál   | 8                   | +2           | -8            |
-| Gyors    | 18                  | -8           | -18           |
+**2-opt**: Élek cseréje ha rövidebb útvonalat kapunk.
+**Or-opt**: 1-2-3 elemű szegmensek áthelyezése jobb pozícióba.
 
 ---
 
-## 5. Folyamatábra
+## 6. Energia-szimuláció és Feasibility
+
+A tervezett útvonalat végigszimulálva ellenőrizzük, hogy minden
+célpont elérhető-e az időn és energián belül, figyelembe véve a
+nappal/éjszaka ciklust.
 
 ```
-                    ┌──────────────┐
-                    │ TÉRKÉP       │
-                    │ BETÖLTÉSE    │
-                    └──────┬───────┘
-                           │
-                    ┌──────▼───────┐
-                    │ ÁSVÁNYOK     │
-                    │ FELTÉRKÉPEZÉS│
-                    └──────┬───────┘
-                           │
-               ┌───────────▼──────────┐
-               │ GREEDY NEAREST       │
-               │ NEIGHBOR SORREND     │
-               │ (energia+időkorlát)  │
-               └───────────┬──────────┘
-                           │
-               ┌───────────▼──────────┐
-               │ 2-OPT LOKÁLIS        │
-               │ JAVÍTÁS              │
-               └───────────┬──────────┘
-                           │
-          ┌────────────────▼────────────────┐
-          │        SZIMULÁCIÓ CIKLUS        │
-          │  ┌──────────────────────────┐   │
-          │  │ Következő ásvány felé    │   │
-          │  │ A* útvonal keresés       │   │
-          │  └────────────┬─────────────┘   │
-          │               │                 │
-          │  ┌────────────▼─────────────┐   │
-          │  │ Sebesség választás       │   │
-          │  │ (akkumulátor + napszak)  │   │
-          │  └────────────┬─────────────┘   │
-          │               │                 │
-          │  ┌────────────▼─────────────┐   │
-          │  │ Mozgás végrehajtás       │   │
-          │  │ Energia számítás         │   │
-          │  │ Nappal/Éjszaka váltás    │   │
-          │  └────────────┬─────────────┘   │
-          │               │                 │
-          │  ┌────────────▼─────────────┐   │
-          │  │ Ásvány elérve?           │   │
-          │  │ → Bányászás (1 tick)     │   │
-          │  └────────────┬─────────────┘   │
-          │               │                 │
-          │  ┌────────────▼─────────────┐   │
-          │  │ Idő/energia elég?        │──NO──→ VISSZATÉRÉS
-          │  │ Van még célpont?         │        A BÁZISRA
-          │  └────────────┬─────────────┘        (A* útvonal)
-          │              YES                         │
-          │               │                          │
-          └───────────────┘                          │
-                                            ┌────────▼───────┐
-                                            │  SZIMULÁCIÓ    │
-                                            │  BEFEJEZVE     │
-                                            └────────────────┘
+FUNCTION Feasibility(útvonal, start, bázis, idő, akku, ciklus_tick):
+    FOR minden célpont:
+        szükséges = oda_táv + 1 (bányász) + haza_táv + 3 (tartalék)
+        IF szükséges > maradék_idő: SKIP
+        IF szimulált_akku_hazaérésnél < 2%: SKIP
+        elfogad(célpont)
+    RETURN elfogadott_célpontok
 ```
 
 ---
 
-## 6. Komplexitás
+## 7. Sebesség-stratégia
+
+| Sebesség | Fogyasztás (K·v²) | Nappal nettó | Éjszaka nettó |
+|----------|-------------------|-------------|---------------|
+| Lassú    | 2                 | **+8**      | **-2**        |
+| Normál   | 8                 | **+2**      | **-8**        |
+| Gyors    | 18                | **-8**      | **-18**       |
+
+**Stratégia**:
+- Nappal 50%+ akku → Normál (jó sebesség, még töltődik)
+- Nappal <50% → Lassú (töltődik +8/tick)
+- Éjszaka → Lassú (-2/tick, fenntartható)
+- Éjszaka 90%+ → Normál (ritka, de gyorsabb)
+- Hazaút + sürgős → Gyors (csak ha muszáj)
+
+---
+
+## 8. Komplexitás
 
 | Komponens              | Időkomplexitás              |
 |------------------------|-----------------------------|
-| A* keresés             | O(n² · log n), n = cellaszám |
-| Greedy NN              | O(m² · A*), m = ásványszám  |
-| 2-opt javítás          | O(m² · iter)                |
+| BFS (1 pont)           | O(N), N = cellamszám        |
+| BFS mátrix (m pont)    | O(m·N)                      |
+| DBSCAN klaszterezés    | O(m²)                       |
+| Klaszter-sorrend       | O(k²), k = klaszterszám     |
+| NN klaszteren belül    | O(m²)                       |
+| 2-opt                  | O(m²·iter)                  |
+| Or-opt                 | O(m²·iter)                  |
 | Szimuláció (1 tick)    | O(1)                        |
 
 ---

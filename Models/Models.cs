@@ -5,7 +5,7 @@ namespace MarsRover.Models
     public enum CellType { Empty, Wall, MineralB, MineralY, MineralG, Start }
     public enum DayPhase { Day, Night }
     public enum SpeedLevel { Slow = 1, Normal = 2, Fast = 3 }
-    public enum RoverAction { Moving, Mining, Standby, Returning, WaitingForDawn }
+    public enum RoverAction { Moving, Mining, Standby, Returning, WaitingForDawn, Charging }
 
     public readonly struct Pos : IEquatable<Pos>
     {
@@ -19,6 +19,7 @@ namespace MarsRover.Models
         public static bool operator ==(Pos a, Pos b) => a.Equals(b);
         public static bool operator !=(Pos a, Pos b) => !a.Equals(b);
         public int ChebyshevTo(Pos o) => Math.Max(Math.Abs(Row - o.Row), Math.Abs(Col - o.Col));
+        public int ManhattanTo(Pos o) => Math.Abs(Row - o.Row) + Math.Abs(Col - o.Col);
     }
 
     public class LogEntry
@@ -46,20 +47,47 @@ namespace MarsRover.Models
         public CellType[,] Grid { get; }
         public Pos StartPos { get; }
 
-        private MarsMap(CellType[,] g, Pos s) { Grid = g; H = g.GetLength(0); W = g.GetLength(1); StartPos = s; }
+        // Pre-computed walkability for fast access
+        private readonly bool[,] _walkable;
 
+        private MarsMap(CellType[,] g, Pos s)
+        {
+            Grid = g; H = g.GetLength(0); W = g.GetLength(1); StartPos = s;
+            _walkable = new bool[H, W];
+            for (int r = 0; r < H; r++)
+                for (int c = 0; c < W; c++)
+                    _walkable[r, c] = g[r, c] != CellType.Wall;
+        }
+
+        public bool InBounds(int r, int c) => r >= 0 && r < H && c >= 0 && c < W;
         public bool InBounds(Pos p) => p.Row >= 0 && p.Row < H && p.Col >= 0 && p.Col < W;
-        public bool Walkable(Pos p) => InBounds(p) && Grid[p.Row, p.Col] != CellType.Wall;
+        public bool Walkable(Pos p) => InBounds(p) && _walkable[p.Row, p.Col];
         public bool IsMineral(Pos p) => InBounds(p) && Grid[p.Row, p.Col] is CellType.MineralB or CellType.MineralY or CellType.MineralG;
+
+        // Optimized: pre-allocated neighbor array to reduce GC pressure
+        private static readonly int[] _dr = { -1, -1, -1, 0, 0, 1, 1, 1 };
+        private static readonly int[] _dc = { -1, 0, 1, -1, 1, -1, 0, 1 };
+
+        public void GetNeighbors(Pos p, List<Pos> result)
+        {
+            result.Clear();
+            for (int i = 0; i < 8; i++)
+            {
+                int nr = p.Row + _dr[i];
+                int nc = p.Col + _dc[i];
+                if (nr >= 0 && nr < H && nc >= 0 && nc < W && _walkable[nr, nc])
+                    result.Add(new Pos(nr, nc));
+            }
+        }
 
         public IEnumerable<Pos> Neighbors(Pos p)
         {
-            for (int dr = -1; dr <= 1; dr++)
-            for (int dc = -1; dc <= 1; dc++)
+            for (int i = 0; i < 8; i++)
             {
-                if (dr == 0 && dc == 0) continue;
-                var n = new Pos(p.Row + dr, p.Col + dc);
-                if (Walkable(n)) yield return n;
+                int nr = p.Row + _dr[i];
+                int nc = p.Col + _dc[i];
+                if (nr >= 0 && nr < H && nc >= 0 && nc < W && _walkable[nr, nc])
+                    yield return new Pos(nr, nc);
             }
         }
 
@@ -67,9 +95,9 @@ namespace MarsRover.Models
         {
             var list = new List<Pos>();
             for (int r = 0; r < H; r++)
-            for (int c = 0; c < W; c++)
-                if (Grid[r, c] is CellType.MineralB or CellType.MineralY or CellType.MineralG)
-                    list.Add(new Pos(r, c));
+                for (int c = 0; c < W; c++)
+                    if (Grid[r, c] is CellType.MineralB or CellType.MineralY or CellType.MineralG)
+                        list.Add(new Pos(r, c));
             return list;
         }
 

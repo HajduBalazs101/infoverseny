@@ -3,5 +3,114 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
+        <!-- ═══ RETRO CRT PALETTE ═══ -->
+        <Color x:Key="CrtBlack">#0A0A0A</Color>
+        <Color x:Key="CrtDarkBg">#0D0D0D</Color>
+        <Color x:Key="CrtPanelBg">#111111</Color>
+        <Color x:Key="CrtBorder">#1A1A1A</Color>
+        <Color x:Key="CrtGreen">#33FF33</Color>
+        <Color x:Key="CrtGreenDim">#1A8C1A</Color>
+        <Color x:Key="CrtGreenFaint">#0D4D0D</Color>
+        <Color x:Key="CrtAmber">#FFB833</Color>
+        <Color x:Key="CrtAmberDim">#8C6600</Color>
+        <Color x:Key="CrtRed">#FF3333</Color>
+        <Color x:Key="CrtCyan">#33FFCC</Color>
+        <Color x:Key="CrtWhite">#CCCCCC</Color>
+        <Color x:Key="CrtDimText">#444444</Color>
+        <Color x:Key="CrtBlue">#3388FF</Color>
+        <Color x:Key="CrtYellow">#FFD633</Color>
+
+        <SolidColorBrush x:Key="BrCrtBlack" Color="{StaticResource CrtBlack}"/>
+        <SolidColorBrush x:Key="BrCrtGreen" Color="{StaticResource CrtGreen}"/>
+        <SolidColorBrush x:Key="BrCrtGreenDim" Color="{StaticResource CrtGreenDim}"/>
+        <SolidColorBrush x:Key="BrCrtGreenFaint" Color="{StaticResource CrtGreenFaint}"/>
+        <SolidColorBrush x:Key="BrCrtAmber" Color="{StaticResource CrtAmber}"/>
+        <SolidColorBrush x:Key="BrCrtRed" Color="{StaticResource CrtRed}"/>
+        <SolidColorBrush x:Key="BrCrtCyan" Color="{StaticResource CrtCyan}"/>
+        <SolidColorBrush x:Key="BrCrtWhite" Color="{StaticResource CrtWhite}"/>
+        <SolidColorBrush x:Key="BrCrtDimText" Color="{StaticResource CrtDimText}"/>
+        <SolidColorBrush x:Key="BrCrtPanelBg" Color="{StaticResource CrtPanelBg}"/>
+        <SolidColorBrush x:Key="BrCrtBorder" Color="{StaticResource CrtBorder}"/>
+
+        <!-- Button Style -->
+        <Style x:Key="CrtButton" TargetType="Button">
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Background" Value="#1A1A1A"/>
+            <Setter Property="Foreground" Value="#33FF33"/>
+            <Setter Property="BorderBrush" Value="#33FF33"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#33FF33"/>
+                                <Setter Property="Foreground" Value="#0A0A0A"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#1A8C1A"/>
+                                <Setter Property="Foreground" Value="#0A0A0A"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#333333"/>
+                                <Setter Property="Foreground" Value="#333333"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Amber Button -->
+        <Style x:Key="CrtButtonAmber" TargetType="Button" BasedOn="{StaticResource CrtButton}">
+            <Setter Property="Foreground" Value="#FFB833"/>
+            <Setter Property="BorderBrush" Value="#FFB833"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#FFB833"/>
+                                <Setter Property="Foreground" Value="#0A0A0A"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#333333"/>
+                                <Setter Property="Foreground" Value="#333333"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- TextBox Style -->
+        <Style x:Key="CrtTextBox" TargetType="TextBox">
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Background" Value="#0D0D0D"/>
+            <Setter Property="Foreground" Value="#33FF33"/>
+            <Setter Property="BorderBrush" Value="#1A8C1A"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CaretBrush" Value="#33FF33"/>
+            <Setter Property="Padding" Value="4,2"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        </Style>
     </Application.Resources>
 </Application>
