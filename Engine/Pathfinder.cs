@@ -3,192 +3,184 @@ using MarsRover.Models;
 namespace MarsRover.Engine
 {
     /// <summary>
-    /// A* alapú útvonaltervező, amely Chebyshev-heurisztikát használ
-    /// a 8-irányú mozgáshoz. Akadálykerülő legrövidebb utat keres.
+    /// A* útvonalkereső Chebyshev-heurisztikával (8-irányú mozgás).
     /// </summary>
-    public static class AStarPathfinder
+    public static class AStar
     {
-        /// <summary>
-        /// Legrövidebb utat keres A-ból B-be A* algoritmussal.
-        /// Visszatérési érték: a lépések listája (A-t nem tartalmazza, B-t igen),
-        /// vagy null ha nincs út.
-        /// </summary>
         public static List<Pos>? FindPath(MarsMap map, Pos start, Pos goal)
         {
             if (start == goal) return new List<Pos>();
-            if (!map.IsWalkable(goal)) return null;
+            if (!map.Walkable(goal)) return null;
 
-            // Nyílt halmaz prioritási sorral (f-érték alapján)
-            var openSet  = new PriorityQueue<Pos, int>();
-            var cameFrom = new Dictionary<Pos, Pos>();
-            var gScore   = new Dictionary<Pos, int>();
-            var closed   = new HashSet<Pos>();
+            var open = new PriorityQueue<Pos, int>();
+            var from = new Dictionary<Pos, Pos>();
+            var g = new Dictionary<Pos, int>();
+            var closed = new HashSet<Pos>();
 
-            gScore[start] = 0;
-            openSet.Enqueue(start, Heuristic(start, goal));
+            g[start] = 0;
+            open.Enqueue(start, H(start, goal));
 
-            while (openSet.Count > 0)
+            while (open.Count > 0)
             {
-                var current = openSet.Dequeue();
+                var cur = open.Dequeue();
+                if (cur == goal) return Rebuild(from, cur);
+                if (!closed.Add(cur)) continue;
 
-                if (current == goal)
-                    return ReconstructPath(cameFrom, current);
-
-                if (!closed.Add(current)) continue;
-
-                foreach (var neighbor in map.GetNeighbors(current))
+                foreach (var nb in map.Neighbors(cur))
                 {
-                    if (closed.Contains(neighbor)) continue;
-
-                    int tentativeG = gScore[current] + 1; // minden lépés költsége 1
-
-                    if (!gScore.TryGetValue(neighbor, out int currentG) || tentativeG < currentG)
+                    if (closed.Contains(nb)) continue;
+                    int tg = g[cur] + 1;
+                    if (!g.TryGetValue(nb, out int og) || tg < og)
                     {
-                        cameFrom[neighbor] = current;
-                        gScore[neighbor]   = tentativeG;
-                        int f = tentativeG + Heuristic(neighbor, goal);
-                        openSet.Enqueue(neighbor, f);
+                        from[nb] = cur;
+                        g[nb] = tg;
+                        open.Enqueue(nb, tg + H(nb, goal));
                     }
                 }
             }
-
-            return null; // nincs elérhető út
+            return null;
         }
 
-        /// <summary>
-        /// Chebyshev-távolság heurisztika (8-irányú mozgáshoz tökéletes admissible).
-        /// </summary>
-        private static int Heuristic(Pos a, Pos b)
-            => Math.Max(Math.Abs(a.Row - b.Row), Math.Abs(a.Col - b.Col));
-
-        private static List<Pos> ReconstructPath(Dictionary<Pos, Pos> cameFrom, Pos current)
+        public static int Dist(MarsMap map, Pos a, Pos b)
         {
-            var path = new List<Pos> { current };
-            while (cameFrom.ContainsKey(current))
-            {
-                current = cameFrom[current];
-                path.Add(current);
-            }
+            var p = FindPath(map, a, b);
+            return p?.Count ?? int.MaxValue;
+        }
+
+        private static int H(Pos a, Pos b) => a.ChebyshevTo(b);
+
+        private static List<Pos> Rebuild(Dictionary<Pos, Pos> from, Pos cur)
+        {
+            var path = new List<Pos> { cur };
+            while (from.ContainsKey(cur)) { cur = from[cur]; path.Add(cur); }
             path.Reverse();
-            path.RemoveAt(0); // a kiindulópontot nem tartalmazzuk
+            path.RemoveAt(0);
             return path;
-        }
-
-        /// <summary>
-        /// Két pont közötti A* távolság (lépésszám).
-        /// Visszatér int.MaxValue ha nincs út.
-        /// </summary>
-        public static int Distance(MarsMap map, Pos a, Pos b)
-        {
-            var path = FindPath(map, a, b);
-            return path?.Count ?? int.MaxValue;
         }
     }
 
     /// <summary>
-    /// Greedy Nearest-Neighbor + 2-opt javítással működő ásványgyűjtő tervező.
-    /// Klaszterekbe csoportosítja az ásványokat, majd energiatudatos sorrendben
-    /// tervezi meg a bejárást.
+    /// Adaptív ásványgyűjtő tervező:
+    /// - Greedy Nearest Neighbor alapú sorrend
+    /// - 2-opt javítás
+    /// - Folyamatos újratervezés ha az idő/energia engedi
+    /// - Klaszter-tudatos: közeli ásványok csoportos begyűjtése
     /// </summary>
-    public static class MineralPlanner
+    public static class SmartPlanner
     {
-        /// <summary>
-        /// Megtervezi az ásványgyűjtési sorrendet, figyelembe véve:
-        /// - A* távolságokat az ásványok között
-        /// - Energiakorlátokat
-        /// - Vissza kell érni a starthoz
-        /// Visszatér az ásványok optimalizált sorrendjével.
-        /// </summary>
-        public static List<Pos> PlanCollection(MarsMap map, int totalTicksBudget)
+        private static readonly Dictionary<(Pos, Pos), int> _cache = new();
+
+        public static void ClearCache() => _cache.Clear();
+
+        public static int CachedDist(MarsMap map, Pos a, Pos b)
         {
-            var minerals = map.GetAllMinerals();
+            if (a == b) return 0;
+            var key = (a, b);
+            if (_cache.TryGetValue(key, out int d)) return d;
+            d = AStar.Dist(map, a, b);
+            _cache[key] = d;
+            _cache[(b, a)] = d;
+            return d;
+        }
+
+        /// <summary>
+        /// Megtervezi a gyűjtési sorrendet az aktuális pozícióból,
+        /// figyelembe véve a maradék időt és energiát.
+        /// Újrahívható menet közben (adaptív újratervezés).
+        /// </summary>
+        public static List<Pos> Plan(MarsMap map, Pos currentPos, HashSet<Pos> alreadyCollected,
+            int ticksRemaining, double battery, int currentTickInCycle)
+        {
+            var minerals = map.AllMinerals()
+                .Where(m => !alreadyCollected.Contains(m))
+                .ToList();
+
             if (minerals.Count == 0) return new List<Pos>();
 
-            var start = map.StartPos;
-
-            // 1. Lépés: Előre kiszámoljuk a távolságokat (start + összes ásvány között)
-            //    Csak a legközelebbi ~120 ásványt vizsgáljuk a teljesítmény miatt
-            var allPoints = new List<Pos> { start };
-            allPoints.AddRange(minerals);
-
-            // Távolság cache
-            var distCache = new Dictionary<(Pos, Pos), int>();
-
-            int GetDist(Pos a, Pos b)
-            {
-                if (a == b) return 0;
-                var key = (a, b);
-                if (distCache.TryGetValue(key, out int d)) return d;
-                d = AStarPathfinder.Distance(map, a, b);
-                distCache[key] = d;
-                distCache[(b, a)] = d; // szimmetrikus
-                return d;
-            }
-
-            // 2. Greedy Nearest Neighbor: mindig a legközelebbi ásványt választjuk
+            // Greedy Nearest Neighbor az idő- és energiakorlátokkal
             var remaining = new HashSet<Pos>(minerals);
-            var route     = new List<Pos>();
-            var current   = start;
+            var route = new List<Pos>();
+            var cur = currentPos;
+            int simTick = 0;
+            double simBatt = battery;
+            int simCycleTick = currentTickInCycle;
 
-            // Időszimuláció a tervezéshez
-            int    simTick      = 0;
-            int    tickBudget   = totalTicksBudget;
-
-            while (remaining.Count > 0 && simTick < tickBudget)
+            while (remaining.Count > 0 && simTick < ticksRemaining)
             {
-                // Keressük a legközelebbi ásványt, ahová el tudunk jutni ÉS vissza
-                Pos? best     = null;
-                int  bestDist = int.MaxValue;
+                Pos? best = null;
+                int bestDist = int.MaxValue;
+                double bestScore = double.MinValue;
 
-                foreach (var mineral in remaining)
+                foreach (var m in remaining)
                 {
-                    int distToMineral = GetDist(current, mineral);
-                    if (distToMineral == int.MaxValue) continue;
+                    int dTo = CachedDist(map, cur, m);
+                    if (dTo == int.MaxValue) continue;
+                    int dBack = CachedDist(map, m, map.StartPos);
+                    if (dBack == int.MaxValue) continue;
 
-                    int distBack = GetDist(mineral, start);
-                    if (distBack == int.MaxValue) continue;
+                    // Kell idő: odajutás + bányászás(1 tick) + hazajutás
+                    int ticksNeeded = dTo + 1 + dBack;
+                    int ticksLeft = ticksRemaining - simTick;
+                    if (ticksNeeded > ticksLeft - 2) continue; // 2 tick tartalék
 
-                    // Elég idő marad-e eljutni, kibányászni (1 tick), és visszajutni?
-                    int ticksNeeded = distToMineral + 1 + distBack; // lassú sebességgel
-                    int ticksRemaining = tickBudget - simTick;
-                    if (ticksNeeded > ticksRemaining) continue;
+                    // Energia becslés: lassú sebességnél legrosszabb eset
+                    double estEnergy = EstimateEnergy(dTo + 1, simBatt, simCycleTick);
+                    if (estEnergy < 5) continue;
 
-                    // Energia ellenőrzés (durva becslés: lassú sebességnél 2/lépés, nappal +10 töltés)
-                    // Pontos szimulációt a Simulator végez, itt csak szűrünk
-                    if (distToMineral < bestDist)
+                    // Pontozás: közelség + klaszter-bonus (közeli ásványokhoz közel)
+                    int clusterBonus = 0;
+                    foreach (var other in remaining)
                     {
-                        bestDist = distToMineral;
-                        best = mineral;
+                        if (other == m) continue;
+                        if (m.ChebyshevTo(other) <= 5) clusterBonus++;
+                    }
+
+                    double score = -dTo + clusterBonus * 3.0;
+
+                    if (score > bestScore || (Math.Abs(score - bestScore) < 0.01 && dTo < bestDist))
+                    {
+                        bestScore = score;
+                        bestDist = dTo;
+                        best = m;
                     }
                 }
 
-                if (best == null) break; // nincs elérhető ásvány az időn belül
+                if (best == null) break;
 
                 route.Add(best.Value);
                 remaining.Remove(best.Value);
-
-                // Szimuláció előreléptetése
-                simTick += bestDist + 1; // mozgás + bányászás
-                current  = best.Value;
+                simTick += bestDist + 1;
+                simBatt = EstimateEnergy(bestDist + 1, simBatt, simCycleTick);
+                simCycleTick = (simCycleTick + bestDist + 1) % 48;
+                cur = best.Value;
             }
 
-            // 3. 2-opt lokális javítás a sorrenden
-            route = TwoOptImprove(route, start, GetDist);
+            // 2-opt javítás
+            if (route.Count >= 3)
+                route = TwoOpt(route, currentPos, map);
 
             return route;
         }
 
-        /// <summary>
-        /// 2-opt lokális keresés: megpróbálja a sorrend szegmenseit megfordítani
-        /// a teljes úthossz csökkentése érdekében.
-        /// </summary>
-        private static List<Pos> TwoOptImprove(List<Pos> route, Pos start, Func<Pos, Pos, int> dist)
+        /// <summary>Becslés: mennyi energia marad N tick után.</summary>
+        private static double EstimateEnergy(int ticks, double battery, int cycleTick)
         {
-            if (route.Count < 3) return route;
+            double b = battery;
+            for (int i = 0; i < ticks; i++)
+            {
+                int ct = (cycleTick + i) % 48;
+                bool isDay = ct < 32;
+                double drain = 2; // lassú sebesség
+                double charge = isDay ? 10 : 0;
+                b = Math.Clamp(b - drain + charge, 0, 100);
+            }
+            return b;
+        }
 
+        private static List<Pos> TwoOpt(List<Pos> route, Pos start, MarsMap map)
+        {
             bool improved = true;
-            int maxIter = 50; // max iteráció a teljesítmény érdekében
-
+            int maxIter = 80;
             while (improved && maxIter-- > 0)
             {
                 improved = false;
@@ -196,22 +188,18 @@ namespace MarsRover.Engine
                 {
                     for (int j = i + 2; j < route.Count; j++)
                     {
-                        var prevI = (i == 0) ? start : route[i - 1];
-                        var nextJ = (j == route.Count - 1) ? start : route[j + 1];
-
-                        int currentCost = dist(prevI, route[i]) + dist(route[j], nextJ);
-                        int newCost     = dist(prevI, route[j]) + dist(route[i], nextJ);
-
-                        if (newCost < currentCost)
+                        var pi = i == 0 ? start : route[i - 1];
+                        var nj = j == route.Count - 1 ? start : route[j + 1];
+                        int oldC = CachedDist(map, pi, route[i]) + CachedDist(map, route[j], nj);
+                        int newC = CachedDist(map, pi, route[j]) + CachedDist(map, route[i], nj);
+                        if (newC < oldC)
                         {
-                            // Megfordítjuk az i..j szegmenst
                             route.Reverse(i, j - i + 1);
                             improved = true;
                         }
                     }
                 }
             }
-
             return route;
         }
     }

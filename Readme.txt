@@ -1,7 +1,7 @@
-═══════════════════════════════════════════════════
-  MARS ROVER – Vadász Dénes Informatika Verseny 2026
-  Programozói Kategória
-═══════════════════════════════════════════════════
+================================================================
+  MARS ROVER - Mission Control
+  Vadász Dénes Informatika Verseny 2026 - Programozói Kategória
+================================================================
 
 Csapat neve: [CSAPAT NÉV]
 Csapattagok:
@@ -10,54 +10,54 @@ Csapattagok:
 Felkészítő tanár: [Tanár neve]
 Email: [email cím]
 
-───────────────────────────────────────────────────
+----------------------------------------------------------------
 FEJLESZTŐI KÖRNYEZET
-───────────────────────────────────────────────────
+----------------------------------------------------------------
 Programnyelv:     C# (.NET 8.0)
 Keretrendszer:    WPF (Windows Presentation Foundation)
 IDE:              Visual Studio 2022 (v17.x)
 NuGet csomagok:   LiveChartsCore.SkiaSharpView.WPF 2.0.0-rc3.3
 Target:           Windows x64
 
-───────────────────────────────────────────────────
+----------------------------------------------------------------
 HASZNÁLATI ÚTMUTATÓ
-───────────────────────────────────────────────────
+----------------------------------------------------------------
 
 1. INDÍTÁS
    - Nyisd meg a MarsRover.sln fájlt Visual Studio 2022-ben
-   - Vagy futtasd a MarsRover.exe fájlt (a mars_map_50x50.csv-nek
-     mellette kell lennie)
-   - Release build: jobb klikk a projektre → Publish → Folder
+   - Build > Rebuild Solution (Release | Any CPU)
+   - F5 vagy Ctrl+F5 a futtatáshoz
+   - Az exe a bin\Release\net8.0-windows\ mappában lesz
+   - A mars_map_50x50.csv-nek az exe mellett kell lennie
 
-2. FUTTATÁS
-   - A program betölti a mars_map_50x50.csv térképet
-   - Adj meg időkeretet órában (min. 24 óra, ajánlott: 48-72)
-   - Nyomd meg az INDÍTÁS gombot
-   - A program megtervezi az útvonalat (A* + Greedy TSP + 2-opt),
-     majd elindítja a szimulációt
+2. KEZELÉS
+   - Időkeret megadása (min. 24 óra, ajánlott: 48-72)
+   - INDÍTÁS gomb: AI megtervezi az útvonalat, majd elindul
+   - II / > gomb: szüneteltetés / folytatás
+   - Újraindítás gomb: teljes reset, új paraméterekkel
+   - CSV gomb: részletes napló exportálása
+   - Animáció slider: szimuláció sebesség (20-800ms/tick)
 
-3. VEZÉRLÉS
-   - ▶/⏸ gomb: szimuláció indítás/szüneteltetés
-   - Animáció slider: szimuláció sebesség szabályozása (50-1000ms/tick)
-   - 📋 gomb: eseménynapló exportálása CSV fájlba
+3. AI JELLEMZŐK
+   - A* keresés Chebyshev-heurisztikával (8-irányú mozgás)
+   - Klaszter-tudatos Greedy Nearest Neighbor sorrend
+   - 2-opt lokális javítás az úthossz minimalizálására
+   - ADAPTÍV ÚJRATERVEZÉS: 20 tick-enként újraszámolja a célokat
+   - Éjszakai energiatakarékos mód (napkelteváró stratégia)
+   - Útba eső ásványok automatikus begyűjtése
+   - Intelligens sebességválasztás (napszak + energia alapján)
+   - Folyamatosan kihasználja az összes rendelkezésre álló időt
 
 4. DASHBOARD
-   A jobb oldali panelen valós időben frissülő adatok:
-   - Akkumulátor szint és grafikon
-   - Gyűjtött ásványok (kék/sárga/zöld) és összesített grafikon
-   - Rover pozíció, sebesség, tevékenység
-   - Nappal/éjszaka ciklus
+   - Valós idejű akkumulátor szint és energia-delta kijelzés
+   - Ásványgyűjtés számlálók (kék/sárga/zöld + összesen)
+   - Rover telemetria (pozíció, sebesség, akció, Sol, fázis)
+   - Energia görbe grafikon
+   - Ásványgyűjtés kumulatív grafikon
    - Sebesség grafikon
-   - Eseménynapló
+   - Részletes eseménynapló
 
-───────────────────────────────────────────────────
-ÚTVONALTERVEZŐ ALGORITMUS (röviden)
-───────────────────────────────────────────────────
-1. A* keresés – akadálykerülő legrövidebb út, Chebyshev-heurisztikával
-2. Greedy Nearest Neighbor – legközelebbi ásvány kiválasztása energia-
-   és időkorlátok figyelembevételével
-3. 2-opt lokális javítás – az ásványgyűjtési sorrend optimalizálása
-   a teljes úthossz csökkentésére
-4. Adaptív sebességválasztás – napszak és energiaszint alapján
-
-Részletes leírás: algoritmus_leiras.pdf
+----------------------------------------------------------------
+ÚTVONALTERVEZŐ ALGORITMUS
+----------------------------------------------------------------
+Részletes leírás: algoritmus_leiras.md / .pdf

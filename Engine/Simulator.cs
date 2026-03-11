@@ -1,316 +1,329 @@
-using System.IO;
 using MarsRover.Models;
 
 namespace MarsRover.Engine
 {
     /// <summary>
-    /// A Mars Rover szimuláció fő motorja.
-    /// Fél-óránkénti tickekben működik, kezeli:
-    /// - mozgás (3 sebesség)
-    /// - nappal/éjszaka ciklus (16h/8h)
-    /// - akkumulátor töltés/fogyasztás
-    /// - ásványgyűjtés
-    /// - eseménynapló
+    /// Mars Rover szimulációs motor – okos energiamenedzsmenttel,
+    /// adaptív újratervezéssel, éjszakai energiatakarékos móddal.
     /// </summary>
     public class Simulator
     {
-        // ── Konstansok ──
-        public const int DAY_TICKS   = 32;  // 16 óra × 2 tick/óra
-        public const int NIGHT_TICKS = 16;  // 8 óra × 2 tick/óra
-        public const int CYCLE_TICKS = 48;  // 24 óra
-        public const double MAX_BATTERY     = 100.0;
-        public const double K_ENERGY        = 2.0;
-        public const double SOLAR_CHARGE    = 10.0; // nappal töltés / tick
-        public const double STANDBY_DRAIN   = 1.0;  // standby fogyasztás / tick
-        public const double MINING_DRAIN    = 2.0;  // bányászás fogyasztás / tick
+        public const int DAY_TICKS = 32;
+        public const int NIGHT_TICKS = 16;
+        public const int CYCLE_TICKS = 48;
+        public const double MAX_BATT = 100.0;
+        public const double K = 2.0;
+        public const double SOLAR = 10.0;
+        public const double STANDBY_DRAIN = 1.0;
+        public const double MINING_DRAIN = 2.0;
+        private const int REPLAN_INTERVAL = 20; // tick-enként újratervez
 
-        // ── Állapot ──
         public MarsMap Map { get; }
         public int TotalHours { get; }
         public int TotalTicks => TotalHours * 2;
 
-        public Pos    RoverPos     { get; private set; }
-        public double Battery      { get; private set; } = MAX_BATTERY;
-        public int    CurrentTick  { get; private set; } = 0;
-        public int    StepsTotal   { get; private set; } = 0;
-        public int    MineralsB    { get; private set; } = 0;
-        public int    MineralsY    { get; private set; } = 0;
-        public int    MineralsG    { get; private set; } = 0;
-        public int    TotalMinerals => MineralsB + MineralsY + MineralsG;
-        public RoverAction CurrentAction { get; private set; } = RoverAction.Standby;
-        public SpeedLevel  CurrentSpeed  { get; private set; } = SpeedLevel.Slow;
+        public Pos RoverPos { get; private set; }
+        public double Battery { get; private set; } = MAX_BATT;
+        public int Tick { get; private set; } = 0;
+        public int Steps { get; private set; } = 0;
+        public int MinB { get; private set; } = 0;
+        public int MinY { get; private set; } = 0;
+        public int MinG { get; private set; } = 0;
+        public int TotalMin => MinB + MinY + MinG;
+        public RoverAction Action { get; private set; } = RoverAction.Standby;
+        public SpeedLevel Speed { get; private set; } = SpeedLevel.Slow;
+        public bool Finished => Tick >= TotalTicks;
+        public bool Home { get; private set; } = false;
 
-        public bool IsFinished => CurrentTick >= TotalTicks;
-        public bool ReturnedHome { get; private set; } = false;
-
-        // Begyűjtött ásványok pozíciói
-        public HashSet<Pos> CollectedMinerals { get; } = new();
-
-        // Napló
+        public HashSet<Pos> Collected { get; } = new();
         public List<LogEntry> Log { get; } = new();
-
-        // Tervezett útvonal (vizualizációhoz)
         public List<Pos> PlannedRoute { get; private set; } = new();
-        public List<Pos> ActualPath   { get; } = new();
+        public List<Pos> Trail { get; } = new();
 
-        // Aktuális mozgási célpont és az ahhoz vezető A* útvonal
-        private Queue<Pos> _currentPathQueue = new();
-        private List<Pos>  _mineralTargets   = new();
-        private int        _mineralTargetIdx = 0;
-        private bool       _isMining         = false;
-        private bool       _isReturning      = false;
+        private Queue<Pos> _pathQ = new();
+        private List<Pos> _targets = new();
+        private int _targetIdx = 0;
+        private bool _mining = false;
+        private bool _returning = false;
+        private int _lastReplanTick = -999;
 
-        // Események callback
-        public event Action<LogEntry>? OnTickCompleted;
-        public event Action? OnSimulationFinished;
+        public event Action<LogEntry>? OnTick;
+        public event Action? OnDone;
 
-        public Simulator(MarsMap map, int totalHours)
+        public Simulator(MarsMap map, int hours)
         {
-            Map        = map;
-            TotalHours = Math.Max(24, totalHours);
-            RoverPos   = map.StartPos;
-            ActualPath.Add(RoverPos);
+            Map = map;
+            TotalHours = Math.Max(24, hours);
+            RoverPos = map.StartPos;
+            Trail.Add(RoverPos);
         }
 
-        /// <summary>Megtervezi az ásványgyűjtési sorrendet.</summary>
-        public void PlanRoute()
-        {
-            _mineralTargets = MineralPlanner.PlanCollection(Map, TotalTicks);
-            PlannedRoute    = new List<Pos>(_mineralTargets);
-            _mineralTargetIdx = 0;
-        }
+        public DayPhase Phase => PhaseAt(Tick);
+        public DayPhase PhaseAt(int t) => (t % CYCLE_TICKS) < DAY_TICKS ? DayPhase.Day : DayPhase.Night;
+        public int TickInCycle => Tick % CYCLE_TICKS;
 
-        /// <summary>Napszak meghatározása a tick alapján.</summary>
-        public DayPhase GetPhase(int tick)
-        {
-            int inCycle = tick % CYCLE_TICKS;
-            return inCycle < DAY_TICKS ? DayPhase.Day : DayPhase.Night;
-        }
-
-        public DayPhase CurrentPhase => GetPhase(CurrentTick);
-
-        /// <summary>Mennyi idő van még hátra az aktuális napszakban (tickben).</summary>
-        public int TicksUntilPhaseChange
+        public int TicksToPhaseChange
         {
             get
             {
-                int inCycle = CurrentTick % CYCLE_TICKS;
-                if (inCycle < DAY_TICKS) return DAY_TICKS - inCycle;
-                return CYCLE_TICKS - inCycle;
+                int ic = Tick % CYCLE_TICKS;
+                return ic < DAY_TICKS ? DAY_TICKS - ic : CYCLE_TICKS - ic;
             }
         }
 
-        /// <summary>
-        /// Egyetlen fél-órás tick szimulálása.
-        /// Ez az a metódus amit a UI timer hív meg ismételten.
-        /// </summary>
-        public void SimulateTick()
+        /// <summary>Első tervezés indítás előtt.</summary>
+        public void PlanInitial()
         {
-            if (IsFinished) return;
+            SmartPlanner.ClearCache();
+            Replan();
+        }
 
-            var phase = CurrentPhase;
-            string eventText = "";
+        /// <summary>Adaptív újratervezés: újraszámolja a hátralevő célokat.</summary>
+        private void Replan()
+        {
+            _targets = SmartPlanner.Plan(Map, RoverPos, Collected,
+                TotalTicks - Tick, Battery, TickInCycle);
+            PlannedRoute = new List<Pos>(_targets);
+            _targetIdx = 0;
+            _pathQ.Clear();
+            _returning = false;
+            _lastReplanTick = Tick;
+        }
 
-            // ── Ha éppen bányászik ──
-            if (_isMining)
+        /// <summary>Egy fél-órás tick szimulálása.</summary>
+        public void Step()
+        {
+            if (Finished) return;
+
+            var phase = Phase;
+            string ev = "";
+            double energyBefore = Battery;
+
+            // Napszak váltás jelzés
+            int ic = Tick % CYCLE_TICKS;
+            if (ic == 0 && Tick > 0) ev += "Napfelkelte! ";
+            if (ic == DAY_TICKS) ev += "Napnyugta! ";
+
+            // ── Bányászás tick ──
+            if (_mining)
             {
-                _isMining = false;
-                CurrentAction = RoverAction.Mining;
+                _mining = false;
+                Action = RoverAction.Mining;
+                ApplyEnergy(MINING_DRAIN, phase);
 
-                // Bányászás energiaköltsége
-                double drain = MINING_DRAIN;
-                double charge = (phase == DayPhase.Day) ? SOLAR_CHARGE : 0;
-                Battery = Math.Clamp(Battery - drain + charge, 0, MAX_BATTERY);
-
-                // Ásvány begyűjtése
-                var cellType = Map.Grid[RoverPos.Row, RoverPos.Col];
-                if (!CollectedMinerals.Contains(RoverPos))
+                if (!Collected.Contains(RoverPos))
                 {
-                    CollectedMinerals.Add(RoverPos);
-                    switch (cellType)
+                    Collected.Add(RoverPos);
+                    var ct = Map.Grid[RoverPos.Row, RoverPos.Col];
+                    switch (ct)
                     {
-                        case CellType.MineralB: MineralsB++; eventText = "🔵 Kék ásvány begyűjtve"; break;
-                        case CellType.MineralY: MineralsY++; eventText = "🟡 Sárga ásvány begyűjtve"; break;
-                        case CellType.MineralG: MineralsG++; eventText = "🟢 Zöld ásvány begyűjtve"; break;
+                        case CellType.MineralB: MinB++; ev += "Kék ásvány begyűjtve!"; break;
+                        case CellType.MineralY: MinY++; ev += "Sárga ásvány begyűjtve!"; break;
+                        case CellType.MineralG: MinG++; ev += "Zöld ásvány begyűjtve!"; break;
                     }
                 }
-
-                LogTick(eventText);
+                EmitLog(ev, energyBefore);
                 return;
             }
 
-            // ── Sebesség meghatározása ──
-            SpeedLevel speed = ChooseSpeed(phase);
-            CurrentSpeed = speed;
-            int stepsThisTick = (int)speed;
-
-            // ── Ha nincs úticél, következő ásvány vagy visszatérés ──
-            if (_currentPathQueue.Count == 0)
+            // ── Periodikus újratervezés (ADAPTÍV AI) ──
+            if (!_returning && Tick - _lastReplanTick >= REPLAN_INTERVAL && _targetIdx > 0)
             {
-                if (!_isReturning && _mineralTargetIdx < _mineralTargets.Count)
+                Replan();
+                ev += "AI újratervez... ";
+            }
+
+            // ── Éjszakai energiatakarékos mód ──
+            // Ha éjszaka van ÉS alacsony az energia ÉS hamarosan napfelkelte → várjunk
+            if (phase == DayPhase.Night && Battery < 25 && TicksToPhaseChange <= 6 && !_returning)
+            {
+                Action = RoverAction.WaitingForDawn;
+                ApplyEnergy(STANDBY_DRAIN, phase);
+                ev += "Napfelkeltére várakozás (energiatakarékos)";
+                EmitLog(ev, energyBefore);
+                return;
+            }
+
+            // ── Sebesség választás ──
+            SpeedLevel spd = PickSpeed(phase);
+            Speed = spd;
+            int stepsThisTick = (int)spd;
+
+            // ── Következő úticél keresése ──
+            if (_pathQ.Count == 0 && !_returning)
+            {
+                if (_targetIdx < _targets.Count)
                 {
-                    // Következő ásvány felé indulás
-                    var target = _mineralTargets[_mineralTargetIdx];
+                    var target = _targets[_targetIdx];
 
-                    // Ellenőrzés: elég idő és energia van-e
-                    var pathToTarget = AStarPathfinder.FindPath(Map, RoverPos, target);
-                    var pathBack     = AStarPathfinder.FindPath(Map, target, Map.StartPos);
+                    // Ellenőrzés: van elég idő+energia?
+                    var pathTo = AStar.FindPath(Map, RoverPos, target);
+                    var pathBack = AStar.FindPath(Map, target, Map.StartPos);
 
-                    if (pathToTarget != null && pathBack != null)
+                    if (pathTo != null && pathBack != null)
                     {
-                        int ticksNeeded = pathToTarget.Count + 1 + pathBack.Count;
-                        int ticksLeft   = TotalTicks - CurrentTick;
+                        int need = pathTo.Count + 1 + pathBack.Count;
+                        int left = TotalTicks - Tick;
 
-                        if (ticksNeeded <= ticksLeft && Battery > 10)
+                        if (need <= left - 2 && Battery > 8)
                         {
-                            foreach (var p in pathToTarget) _currentPathQueue.Enqueue(p);
-                            eventText = $"Úticél: ásvány #{_mineralTargetIdx + 1} @ {target}";
+                            foreach (var p in pathTo) _pathQ.Enqueue(p);
+                            ev += $"Cél: ásvány #{TotalMin + 1} @ {target} ";
                         }
                         else
                         {
-                            // Nincs elég idő, visszatérés a bázisra
-                            StartReturn();
-                            eventText = "⏱ Idő/energia kevés → visszatérés a bázisra";
+                            // Nem fér bele → újratervezés rövidebb listával
+                            _targetIdx++;
+                            if (_targetIdx >= _targets.Count)
+                            {
+                                GoHome(ref ev);
+                            }
                         }
                     }
                     else
                     {
-                        _mineralTargetIdx++;
+                        _targetIdx++; // elérhetetlen, skip
                     }
                 }
-                else if (!_isReturning)
+                else
                 {
-                    StartReturn();
-                    eventText = "✅ Összes elérhető ásvány begyűjtve → visszatérés";
+                    // Nincs több célpont → de van idő? Újratervezés!
+                    int ticksLeft = TotalTicks - Tick;
+                    int distHome = SmartPlanner.CachedDist(Map, RoverPos, Map.StartPos);
+                    if (distHome == int.MaxValue) distHome = 50;
+
+                    if (ticksLeft > distHome + 10)
+                    {
+                        // Van még idő, próbáljunk újabb ásványokat keresni
+                        Replan();
+                        if (_targets.Count == 0)
+                        {
+                            GoHome(ref ev);
+                        }
+                        else
+                        {
+                            ev += "Újratervezett útvonal! ";
+                        }
+                    }
+                    else
+                    {
+                        GoHome(ref ev);
+                    }
                 }
             }
 
-            // ── Mozgás végrehajtása ──
-            int stepsDone = 0;
-            for (int s = 0; s < stepsThisTick && _currentPathQueue.Count > 0; s++)
+            // ── Mozgás ──
+            int done = 0;
+            for (int s = 0; s < stepsThisTick && _pathQ.Count > 0; s++)
             {
-                var next = _currentPathQueue.Dequeue();
+                var next = _pathQ.Dequeue();
                 RoverPos = next;
-                ActualPath.Add(next);
-                StepsTotal++;
-                stepsDone++;
+                Trail.Add(next);
+                Steps++;
+                done++;
 
-                // Ha megérkeztünk egy ásványra, bányászás indítása
-                if (!_isReturning && Map.IsMineral(next) && !CollectedMinerals.Contains(next))
+                // Ásvány elérve?
+                if (!_returning && Map.IsMineral(next) && !Collected.Contains(next))
                 {
-                    // Ha ez a célpont
-                    if (_mineralTargetIdx < _mineralTargets.Count && next == _mineralTargets[_mineralTargetIdx])
+                    if (_targetIdx < _targets.Count && next == _targets[_targetIdx])
                     {
-                        _isMining = true;
-                        _mineralTargetIdx++;
-                        eventText += (eventText.Length > 0 ? " | " : "") + $"⛏ Bányászás elkezdve @ {next}";
+                        _mining = true;
+                        _targetIdx++;
+                        ev += $"Bányászás @ {next} ";
+                        break;
+                    }
+                    // Útba eső ásvány: ingyen begyűjtés!
+                    else
+                    {
+                        _mining = true;
+                        ev += $"Útba eső ásvány @ {next} ";
                         break;
                     }
                 }
 
-                // Hazaérkeztünk?
-                if (_isReturning && next == Map.StartPos)
+                if (_returning && next == Map.StartPos)
                 {
-                    ReturnedHome = true;
-                    eventText += (eventText.Length > 0 ? " | " : "") + "🏠 Visszaérkezett a bázisra!";
+                    Home = true;
+                    ev += "Visszaérkezett a bázisra!";
                 }
             }
 
-            // ── Energia számítás ──
-            if (stepsDone > 0)
+            // ── Energia ──
+            if (done > 0)
             {
-                CurrentAction = _isReturning ? RoverAction.Returning : RoverAction.Moving;
-                double drain  = K_ENERGY * (int)speed * (int)speed; // k * v²
-                double charge = (phase == DayPhase.Day) ? SOLAR_CHARGE : 0;
-                Battery = Math.Clamp(Battery - drain + charge, 0, MAX_BATTERY);
+                Action = _returning ? RoverAction.Returning : RoverAction.Moving;
+                double drain = K * (int)spd * (int)spd;
+                ApplyEnergy(drain, phase);
             }
             else
             {
-                // Standby
-                CurrentAction = RoverAction.Standby;
-                double drain  = STANDBY_DRAIN;
-                double charge = (phase == DayPhase.Day) ? SOLAR_CHARGE : 0;
-                Battery = Math.Clamp(Battery - drain + charge, 0, MAX_BATTERY);
-
-                if (string.IsNullOrEmpty(eventText))
-                    eventText = "⏸ Standby";
+                Action = RoverAction.Standby;
+                ApplyEnergy(STANDBY_DRAIN, phase);
+                if (string.IsNullOrEmpty(ev)) ev = "Standby";
             }
 
-            // Napszak váltás jelzés
-            int inCycle = CurrentTick % CYCLE_TICKS;
-            if (inCycle == 0) eventText = "🌅 Napfelkelte! " + eventText;
-            else if (inCycle == DAY_TICKS) eventText = "🌙 Napnyugta! " + eventText;
+            EmitLog(ev, energyBefore);
 
-            LogTick(eventText);
-
-            // Vége?
-            if (IsFinished || (ReturnedHome && _mineralTargetIdx >= _mineralTargets.Count))
-            {
-                OnSimulationFinished?.Invoke();
-            }
+            if (Finished || (Home && _targetIdx >= _targets.Count))
+                OnDone?.Invoke();
         }
 
-        /// <summary>Visszatérési útvonal tervezése a starthoz.</summary>
-        private void StartReturn()
+        private void GoHome(ref string ev)
         {
-            _isReturning = true;
-            _currentPathQueue.Clear();
-            var pathHome = AStarPathfinder.FindPath(Map, RoverPos, Map.StartPos);
-            if (pathHome != null)
-            {
-                foreach (var p in pathHome) _currentPathQueue.Enqueue(p);
-            }
+            _returning = true;
+            _pathQ.Clear();
+            var ph = AStar.FindPath(Map, RoverPos, Map.StartPos);
+            if (ph != null)
+                foreach (var p in ph) _pathQ.Enqueue(p);
+            ev += "Visszatérés a bázisra ";
         }
 
-        /// <summary>
-        /// Sebesség kiválasztása az aktuális helyzet alapján.
-        /// Stratégia:
-        /// - Nappal és sok az energia → gyors
-        /// - Nappal és közepes energia → normál
-        /// - Éjszaka vagy kevés energia → lassú
-        /// </summary>
-        private SpeedLevel ChooseSpeed(DayPhase phase)
+        private void ApplyEnergy(double drain, DayPhase phase)
         {
-            if (Battery <= 15)
-                return SpeedLevel.Slow;
+            double charge = phase == DayPhase.Day ? SOLAR : 0;
+            Battery = Math.Clamp(Battery - drain + charge, 0, MAX_BATT);
+        }
+
+        private SpeedLevel PickSpeed(DayPhase phase)
+        {
+            // Visszatérésnél: gyorsítsunk ha kell
+            if (_returning)
+            {
+                int distHome = _pathQ.Count;
+                int ticksLeft = TotalTicks - Tick;
+                if (distHome > ticksLeft * 2 && Battery > 30) return SpeedLevel.Fast;
+                if (distHome > ticksLeft && Battery > 20) return SpeedLevel.Normal;
+            }
+
+            if (Battery <= 12) return SpeedLevel.Slow;
 
             if (phase == DayPhase.Day)
             {
-                // Nappal: gyors ha sok energia, normál ha közepes
-                if (Battery >= 60) return SpeedLevel.Fast;
+                if (Battery >= 65) return SpeedLevel.Fast;
                 if (Battery >= 30) return SpeedLevel.Normal;
                 return SpeedLevel.Slow;
             }
             else
             {
-                // Éjszaka: energia-takarékos mód
-                if (Battery >= 70) return SpeedLevel.Normal;
+                // Éjszaka: óvatos
+                if (Battery >= 75) return SpeedLevel.Normal;
                 return SpeedLevel.Slow;
             }
         }
 
-        /// <summary>Napló bejegyzés létrehozása és kibocsátása.</summary>
-        private void LogTick(string eventText)
+        private void EmitLog(string ev, double energyBefore)
         {
             var entry = new LogEntry
             {
-                Tick         = CurrentTick,
-                SimHours     = CurrentTick * 0.5,
-                Position     = RoverPos,
-                Battery      = Battery,
-                Speed        = CurrentSpeed,
-                Action       = CurrentAction,
-                Phase        = CurrentPhase,
-                TotalDistance = StepsTotal,
-                MineralsB    = MineralsB,
-                MineralsY    = MineralsY,
-                MineralsG    = MineralsG,
-                EventText    = eventText
+                Tick = Tick, SimHours = Tick * 0.5, Position = RoverPos,
+                Battery = Battery, Speed = Speed, Action = Action,
+                Phase = Phase, TotalDistance = Steps,
+                MineralsB = MinB, MineralsY = MinY, MineralsG = MinG,
+                Event = ev.Trim(), EnergyDelta = Battery - energyBefore
             };
-
             Log.Add(entry);
-            CurrentTick++;
-            OnTickCompleted?.Invoke(entry);
+            Tick++;
+            OnTick?.Invoke(entry);
         }
     }
 }

@@ -3,27 +3,5 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
-        <!-- Mars Theme Colors -->
-        <Color x:Key="MarsBg">#1A1118</Color>
-        <Color x:Key="MarsPanel">#221822</Color>
-        <Color x:Key="MarsAccent">#E8632B</Color>
-        <Color x:Key="MarsAccent2">#F4A623</Color>
-        <Color x:Key="MarsText">#E8DDD3</Color>
-        <Color x:Key="MarsTextDim">#8A7E85</Color>
-        <Color x:Key="MarsGreen">#4ADE80</Color>
-        <Color x:Key="MarsBlue">#60A5FA</Color>
-        <Color x:Key="MarsYellow">#FACC15</Color>
-        <Color x:Key="MarsRed">#EF4444</Color>
-
-        <SolidColorBrush x:Key="BgBrush" Color="{StaticResource MarsBg}"/>
-        <SolidColorBrush x:Key="PanelBrush" Color="{StaticResource MarsPanel}"/>
-        <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource MarsAccent}"/>
-        <SolidColorBrush x:Key="Accent2Brush" Color="{StaticResource MarsAccent2}"/>
-        <SolidColorBrush x:Key="TextBrush" Color="{StaticResource MarsText}"/>
-        <SolidColorBrush x:Key="TextDimBrush" Color="{StaticResource MarsTextDim}"/>
-        <SolidColorBrush x:Key="GreenBrush" Color="{StaticResource MarsGreen}"/>
-        <SolidColorBrush x:Key="BlueBrush" Color="{StaticResource MarsBlue}"/>
-        <SolidColorBrush x:Key="YellowBrush" Color="{StaticResource MarsYellow}"/>
-        <SolidColorBrush x:Key="RedBrush" Color="{StaticResource MarsRed}"/>
     </Application.Resources>
 </Application>
