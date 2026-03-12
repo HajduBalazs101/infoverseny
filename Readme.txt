@@ -3,12 +3,13 @@
   Vadász Dénes Informatika Verseny 2026 - Programozói Kategória
 ================================================================
 
-Csapat neve: [CSAPAT NÉV]
+Csapat neve: While(True)
 Csapattagok:
-  - [Név 1], [Iskola], [Osztály]
-  - [Név 2], [Iskola], [Osztály]
-Felkészítő tanár: [Tanár neve]
-Email: [email cím]
+  - Antal Máté Dániel, Miskolci SZC Kandó Kálmán Informatikai Technikum, 12.A
+  - Hajdu Balázs, Miskolci SZC Kandó Kálmán Informatikai Technikum, 12.A
+  - Szitovszki Máté, Miskolci SZC Kandó Kálmán Informatikai Technikum, 12.A
+Felkészítő tanár: Kasza László Róbert
+Email: antalm@kkszki.hu
 
 ----------------------------------------------------------------
 FEJLESZTŐI KÖRNYEZET
@@ -31,7 +32,7 @@ HASZNÁLATI ÚTMUTATÓ
    - A mars_map_50x50.csv-nek az exe mellett kell lennie
 
 2. KEZELÉS
-   - Időkeret megadása (min. 24 óra, ajánlott: 48-72)
+   - Időkeret megadása (min. 24 óra)
    - INDÍTÁS gomb: AI megtervezi az útvonalat, majd elindul
    - II / > gomb: szüneteltetés / folytatás
    - Újraindítás gomb: teljes reset, új paraméterekkel
@@ -61,3 +62,4 @@ HASZNÁLATI ÚTMUTATÓ
 ÚTVONALTERVEZŐ ALGORITMUS
 ----------------------------------------------------------------
 Részletes leírás: algoritmus_leiras.md / .pdf
+
