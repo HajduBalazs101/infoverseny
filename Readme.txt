@@ -1,6 +1,6 @@
 ================================================================
-  MARS ROVER - Mission Control
-  Vadász Dénes Informatika Verseny 2026 - Programozói Kategória
+  MARS ROVER – Mission Control Terminal v2
+  Vadász Dénes Informatika Verseny 2026 – Programozói Kategória
 ================================================================
 
 Csapat neve: While(True)
@@ -14,52 +14,149 @@ Email: antalm@kkszki.hu
 ----------------------------------------------------------------
 FEJLESZTŐI KÖRNYEZET
 ----------------------------------------------------------------
+
 Programnyelv:     C# (.NET 8.0)
-Keretrendszer:    WPF (Windows Presentation Foundation)
+Keretrendszer:    WPF + SkiaSharp (2D gyorsított renderelés)
 IDE:              Visual Studio 2022 (v17.x)
-NuGet csomagok:   LiveChartsCore.SkiaSharpView.WPF 2.0.0-rc3.3
+NuGet csomagok:   SkiaSharp 2.88.8
+                  SkiaSharp.Views.WPF 2.88.8
 Target:           Windows x64
 
 ----------------------------------------------------------------
-HASZNÁLATI ÚTMUTATÓ
+INDÍTÁS
 ----------------------------------------------------------------
 
-1. INDÍTÁS
-   - Nyisd meg a MarsRover.sln fájlt Visual Studio 2022-ben
-   - Build > Rebuild Solution (Release | Any CPU)
-   - F5 vagy Ctrl+F5 a futtatáshoz
-   - Az exe a bin\Release\net8.0-windows\ mappában lesz
-   - A mars_map_50x50.csv-nek az exe mellett kell lennie
+1. Nyisd meg a MarsRover.sln fájlt Visual Studio 2022-ben
+2. Build > Rebuild Solution
+3. F5 vagy Ctrl+F5 a futtatáshoz
+4. A mars_map_50x50.csv automatikusan az exe mellé másolódik
 
-2. KEZELÉS
-   - Időkeret megadása (min. 24 óra)
-   - INDÍTÁS gomb: AI megtervezi az útvonalat, majd elindul
-   - II / > gomb: szüneteltetés / folytatás
-   - Újraindítás gomb: teljes reset, új paraméterekkel
-   - CSV gomb: részletes napló exportálása
-   - Animáció slider: szimuláció sebesség (20-800ms/tick)
-
-3. AI JELLEMZŐK
-   - A* keresés Chebyshev-heurisztikával (8-irányú mozgás)
-   - Klaszter-tudatos Greedy Nearest Neighbor sorrend
-   - 2-opt lokális javítás az úthossz minimalizálására
-   - ADAPTÍV ÚJRATERVEZÉS: 20 tick-enként újraszámolja a célokat
-   - Éjszakai energiatakarékos mód (napkelteváró stratégia)
-   - Útba eső ásványok automatikus begyűjtése
-   - Intelligens sebességválasztás (napszak + energia alapján)
-   - Folyamatosan kihasználja az összes rendelkezésre álló időt
-
-4. DASHBOARD
-   - Valós idejű akkumulátor szint és energia-delta kijelzés
-   - Ásványgyűjtés számlálók (kék/sárga/zöld + összesen)
-   - Rover telemetria (pozíció, sebesség, akció, Sol, fázis)
-   - Energia görbe grafikon
-   - Ásványgyűjtés kumulatív grafikon
-   - Sebesség grafikon
-   - Részletes eseménynapló
+Ha kézzel futtatod: az exe a bin\Debug\net8.0-windows\win-x64\
+mappában van, a CSV-nek mellette kell lennie.
 
 ----------------------------------------------------------------
-ÚTVONALTERVEZŐ ALGORITMUS
+KEZELÉS
 ----------------------------------------------------------------
-Részletes leírás: algoritmus_leiras.md / .pdf
 
+JOBB PANEL:
+  - ÓRA mező:      Szimuláció időkerete órában (min. 24)
+  - SPD slider:     Animáció sebesség (20–600 ms/tick)
+  - ▶ START:        AI megtervezi az útvonalat, szimuláció indul
+  - ║║ / ▶:         Szünet / folytatás
+  - ↺ RST:          Teljes újraindítás
+  - CSV:            Részletes napló exportálása fájlba
+
+TÉRKÉP NAVIGÁCIÓ:
+  - Egér görgő:     Zoom (az egér pozíciójára zoomol)
+  - Egér húzás:     Térkép mozgatása
+  - WASD:           Térkép mozgatása billentyűzettel
+  - +/-:            Zoom billentyűzettel
+
+Kinagyítva (zoom ≥14x) megjelennek az ásvány betűjelek
+(B/Y/G) és a rover jelölése (R).
+
+----------------------------------------------------------------
+MEGJELENÍTÉS
+----------------------------------------------------------------
+
+A térkép SkiaSharp 2D renderelést használ (nem 3D Viewport),
+ami gyors és reszponzív marad nagy zoom-szinteken is.
+Csak a képernyőn látható cellák kerülnek kirajzolásra.
+
+Retro CRT terminál stílus:
+  - Foszforzöld szövegek, sötét háttér, Consolas font
+  - ASCII progress bar-ok az akkumulátorhoz és ásványokhoz
+  - Éjszakai kék overlay a napszakváltásnál
+
+Térkép színkódok:
+  - Kék cella:      Kék ásvány (B)
+  - Sárga cella:    Sárga ásvány (Y)
+  - Zöld cella:     Zöld ásvány (G)
+  - Szürke cella:   Fal (nem járható)
+  - Sötét cella:    Üres terep
+  - Piros négyzet:  Rover
+  - Zöld cella:     Start/bázis pozíció
+  - Halvány zöld:   Rover nyomvonala
+  - Narancssárga:   Tervezett célpontok
+
+----------------------------------------------------------------
+AI ÚTVONALTERVEZŐ ALGORITMUS
+----------------------------------------------------------------
+
+A rover egy többlépcsős optimalizálási eljárást használ:
+
+1. BFS TÁVOLSÁG-MÁTRIX
+   Minden ásványból és a bázisból BFS-t futtatunk, így
+   megkapjuk a pontos legrövidebb távolságot bármely két
+   fontos pont között. Ez figyelembe veszi a falakat
+   (nem légvonalat számol).
+
+2. KLASZTEREZÉS (DBSCAN + Union-Find)
+   Az ásványokat klaszterekbe soroljuk: ha két ásvány
+   BFS-távolsága ≤ 8 lépés, egy csoportba kerülnek.
+   Így a közeli ásványok együtt lesznek begyűjtve.
+
+3. KLASZTER-SORREND (Nearest Cluster)
+   A klasztereket méret és közelség alapján sorba
+   rendezzük – a rover mindig a legközelebbi, legsűrűbb
+   klasztert célozza meg először.
+
+4. KLASZTEREN BELÜLI SORREND (Nearest Neighbor)
+   Egy klaszteren belül a legközelebbi szomszéd
+   heurisztikával határozza meg a begyűjtési sorrendet.
+
+5. GLOBÁLIS JAVÍTÁS (2-opt + Or-opt)
+   A teljes útvonalra 2-opt és or-opt lokális keresést
+   futtatunk, ami a klaszterek közötti átmeneteket is
+   javítja.
+
+6. FEASIBILITY ELLENŐRZÉS
+   Az útvonalat végigszimulálva ellenőrzi, hogy minden
+   célpont elérhető-e az időn és energián belül.
+   Figyelembe veszi a nappal/éjszaka ciklust és a
+   sebesség-stratégiát.
+
+Részletes pszeudokód: algoritmus_leiras.md
+
+----------------------------------------------------------------
+SEBESSÉG-STRATÉGIA
+----------------------------------------------------------------
+
+A rover sebessége automatikusan alkalmazkodik:
+
+              Fogyasztás    Nappali nettó    Éjszakai nettó
+  Lassú       2/tick          +8/tick          -2/tick
+  Normál      8/tick          +2/tick          -8/tick
+  Gyors      18/tick          -8/tick         -18/tick
+
+Nappal:   Normál az alap (nettó +2, sosem fogy el)
+          80%+ akku → Gyors (3 lépés/tick)
+          <20% akku → Lassú (feltöltődés)
+Éjszaka:  50%+ akku → Normál
+          <50% → Lassú (biztonságos)
+Hazaút:   Ha szükséges, Gyors módra vált
+
+----------------------------------------------------------------
+DASHBOARD ELEMEK
+----------------------------------------------------------------
+
+  AKKUMULÁTOR:  Töltöttség %-ban, ASCII bar, energia-delta
+  ÁSVÁNYOK:     Összesen + típusonként (kék/sárga/zöld)
+  TELEMETRIA:   Pozíció, sebesség, akció, Sol, fázisváltás
+  NAPLÓ:        Valós idejű eseménynapló (bányászás,
+                napszakváltás, újratervezés, stb.)
+
+----------------------------------------------------------------
+FÁJLSTRUKTÚRA
+----------------------------------------------------------------
+
+  MarsRover.sln              Solution fájl
+  MarsRover.csproj           Projekt konfiguráció
+  App.xaml / App.xaml.cs     Alkalmazás + retro stílusú témák
+  MainWindow.xaml            UI layout (panel + térkép)
+  MainWindow.xaml.cs         Renderelés, kamera, szimuláció UI
+  Engine\Pathfinder.cs       A*, BFS, klaszter-TSP tervező
+  Engine\Simulator.cs        Szimulációs motor, sebesség-logika
+  Models\Models.cs           Térkép, pozíció, napló modellek
+  mars_map_50x50.csv         50x50-es Mars térkép
+  algoritmus_leiras.md       Algoritmus dokumentáció
